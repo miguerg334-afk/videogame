@@ -1,16 +1,24 @@
 # APEX — Night Drive
 
-Experiencia de conducción nocturna en una ruta de montaña de 5,2 km, con un puerto de montaña de pendientes de hasta el 27%, unos 244 metros de desnivel, dos túneles, luna visible y carro configurable. Aplicación modular con compilación de producción.
-
-![Conducción nocturna en el Puerto del Alba](docs/images/night-drive.png)
+Conducción nocturna con un carro deportivo procedural: suspensión por rueda, pintura configurable, faros y velocidad normal máxima de 200 km/h e impulso temporal de 300 km/h. Ruta de montaña de 5,2 km con dos túneles, atajos y una zona explorable de 3,8 × 2,9 km.
 
 ## Qué incluye
 
-- Carro procedural con suspensión por rueda, frenado, reversa y colisiones.
+- Carro deportivo 3D con suspensión, dirección, frenado, reversa y colisiones; 200 km/h normales y 300 km/h con power-up.
+- 47 cristales azules con rayos repartidos por carretera, atajos y montañas, señalados en el minimapa. Se recogen al tocarlos, dan 12 segundos de impulso y reaparecen a los 45 segundos. Otro cristal renueva el efecto; R lo cancela.
+- Indicador de tiempo de impulso junto al velocímetro. Al terminar, vuelve el límite de 200 km/h.
 - Circuito de 5,2 km con dos túneles, ascensión y descenso de hasta el 27%.
-- Ambiente nocturno, luna visible y faros que se pueden encender y apagar.
-- Cámaras de seguimiento y conductor, pintura configurable y controles táctiles.
-- Minimap, telemetría y acceso directo a la subida con M.
+- Ambiente nocturno con cielo degradado, luna elevada, cordilleras en tres planos y faros que se pueden encender y apagar.
+- Cámaras de seguimiento y conductor, selector de pintura, teclado y controles táctiles.
+- Interior y exterior explorables, sin defensas junto a la carretera, con movimiento por terreno y laderas.
+- Zona de 3,8 × 2,9 km delimitada por un muro de piedra físico con balizas ámbar y perímetro visible en el minimapa.
+- Bosque de 1.800 árboles con corteza, ramas y colisión de troncos; suelo con hierba, tierra y detalle de roca.
+- Renderizado por sectores: terreno sin recortes de geometría, árboles detallados cercanos, siluetas lejanas y descarte de sectores fuera de cámara.
+- Resolución adaptativa, sombras acotadas y contador de FPS. La física conserva su paso de 120 Hz; los fotogramas muy lentos tienen un límite de recuperación para evitar una acumulación de trabajo.
+- Tres atajos de tierra: Mirador, Pinar y Cumbre; accesos libres y caminos visibles en el minimapa.
+- Bosques con troncos texturados, ramas, copas variadas y colisiones en los troncos.
+- Minimap, telemetría y acceso directo a la subida con M y a los atajos con V.
+- Asfalto con áridos y desgaste, drenajes y reflectores; refuerzos de acero y tornillería en los túneles.
 
 ## Ejecutar
 
@@ -36,9 +44,9 @@ La vista previa usa http://127.0.0.1:4173. No se abre el HTML con `file://`: la 
 ## Tecnología y decisiones
 
 - **Vite 8** para desarrollo con recarga automática y compilación de producción.
-- **TypeScript en modo estricto** para arranque, física del vehículo, ciclo de conducción, cámara, interfaz y gestión de recursos.
-- **Three.js** para WebGL y **Rapier 3D** para colisiones, suspensión por rueda y simulación a 120 Hz.
-- **GSAP** para las transiciones de color y entrada de interfaz.
+- **TypeScript en modo estricto** para arranque, física del carro, ciclo del juego, cámara, interfaz y gestión de recursos.
+- **Three.js** para WebGL y **Rapier 3D** para colisiones y suspensión a 120 Hz.
+- **GSAP** para la entrada de interfaz.
 - Dependencias npm fijadas y `package-lock.json` para instalaciones reproducibles. La aplicación servida no carga librerías desde CDN.
 - Los generadores de geometría del vehículo y la montaña permanecen en módulos JavaScript con interfaces JSDoc. Sus internals no están sometidos a `checkJs`; sus límites se consumen desde TypeScript. Esto conserva el modelo probado sin mezclar esta migración con una reescritura del motor gráfico.
 - Conservamos Three.js 0.128 y Rapier 0.17.3 para mantener la iluminación y el comportamiento físico existentes. Una actualización mayor de estos motores requiere su propia revisión visual y física.
@@ -52,7 +60,8 @@ index.html             Documento de entrada y estructura del HUD
 src/main.ts            Arranque asíncrono y gestión de errores
 src/app/               Sesión de conducción y ciclo de vida de eventos
 src/engine/            Renderizador, cámara, matemáticas, tipos y limpieza GPU
-src/vehicle/           Modelo procedural y física del vehículo
+src/character/         Personaje articulado, animación y controlador cinemático
+src/vehicle/           Implementación anterior conservada para referencia y pruebas
 src/world/             Ruta ampliada, terreno continuo, túneles, colliders y luces
 src/ui/                Minimap y acceso tipado al DOM
 src/styles/            Estilos de la interfaz
@@ -80,19 +89,20 @@ Para activarla, copia ese archivo a `.github/workflows/check.yml` desde GitHub o
 
 ## Controles
 
-| Acción                               | Control                   |
-| ------------------------------------ | ------------------------- |
-| Acelerar / frenar y reversa          | ↑ / ↓ o W / S             |
-| Dirección                            | ← / → o A / D             |
-| Freno de mano                        | Espacio                   |
-| Encender/apagar faros                | L                         |
-| Cambiar cámara                       | C                         |
-| Volver a la carretera                | R                         |
-| Ir al comienzo del puerto de montaña | M                         |
-| Pausa                                | P o Esc                   |
-| Pintura                              | Selector superior derecho |
+| Acción | Control |
+| --- | --- |
+| Acelerar / frenar y reversa | ↑ / ↓ o W / S |
+| Girar | ← / → o A / D |
+| Freno de mano | Espacio |
+| Faros | L |
+| Cámara de seguimiento / conductor | C |
+| Volver a la carretera | R |
+| Ir al puerto de montaña | M |
+| Explorar los atajos | V |
+| Cambiar pintura | Selector superior derecho |
+| Pausa | P o Esc |
 
-Los controles táctiles aparecen en dispositivos con puntero táctil. La pintura se conserva localmente. La aplicación se pausa al perder el foco.
+La aplicación se pausa al perder el foco. La pintura se conserva localmente. El personaje experimental permanece en el código como referencia, pero no se carga en el juego.
 
 ## Estado del producto
 

@@ -2,6 +2,10 @@ import R from '@dimforge/rapier3d-compat/rapier.es.js';
 import { rotateVector } from '../engine/math';
 import type { DrivingInput, DrivingState, VectorLike } from '../engine/types';
 
+export const MAX_SPEED_KMH = 200;
+export const BOOST_SPEED_KMH = 300;
+export const BOOST_DURATION = 12;
+
 export function createDrivingPhysics(world: R.World) {
   const body = world.createRigidBody(
     R.RigidBodyDesc.dynamic()
@@ -40,7 +44,7 @@ export function createDrivingPhysics(world: R.World) {
       vehicle.setWheelSuspensionStiffness(i, 42);
       vehicle.setWheelSuspensionCompression(i, 4.8);
       vehicle.setWheelSuspensionRelaxation(i, 5.7);
-      vehicle.setWheelMaxSuspensionTravel(i, 0.18);
+      vehicle.setWheelMaxSuspensionTravel(i, 0.24);
       vehicle.setWheelMaxSuspensionForce(i, 14000);
       vehicle.setWheelFrictionSlip(i, 1.65);
       vehicle.setWheelSideFrictionStiffness(i, 0.95);
@@ -49,8 +53,12 @@ export function createDrivingPhysics(world: R.World) {
     throttle = 0,
     reverse = false,
     speed = 0,
-    braking = false;
+    braking = false,
+    boostRemaining = 0;
   function step(input: DrivingInput, dt: number, offroad = false): DrivingState {
+    boostRemaining = Math.max(0, boostRemaining - dt);
+    const boosting = boostRemaining > 0;
+    const maxSpeed = (boosting ? BOOST_SPEED_KMH : MAX_SPEED_KMH) / 3.6;
     const velocity = body.linvel(),
       q = body.rotation(),
       forward = rotateVector(q, { x: 1, y: 0, z: 0 });
@@ -79,21 +87,26 @@ export function createDrivingPhysics(world: R.World) {
       ((input.left ? 1 : 0) - (input.right ? 1 : 0)) * (0.51 / (1 + Math.abs(speed) * 0.035));
     steering += (desiredSteer - steering) * Math.min(1, dt * (drive ? 5 : 7));
     throttle += (drive - throttle) * Math.min(1, dt * 3.8);
-    const powerDrop = Math.max(0.18, 1 - Math.abs(speed) / 69),
-      force = throttle * (reverse ? 2200 : 3850) * powerDrop;
+    const powerDrop = reverse
+        ? Math.max(0.18, 1 - Math.abs(speed) / 69)
+        : Math.max(boosting ? 0.8 : 0.72, 1 - Math.abs(speed) / 180),
+      force = throttle * (reverse ? 2200 : boosting ? 12000 : 8000) * powerDrop;
     for (let i = 0; i < 4; i++) {
       const front = wheels[i].front;
       vehicle.setWheelSteering(i, front ? steering : 0);
-      vehicle.setWheelEngineForce(i, front ? 0 : reverse && speed < -9 ? 0 : force);
+      vehicle.setWheelEngineForce(
+        i,
+        reverse && speed < -9 ? 0 : offroad ? force * 0.58 : front ? 0 : force,
+      );
       vehicle.setWheelBrake(
         i,
         braking ? (front ? 80 : 55) : input.handbrake && !front ? 70 : drive === 0 ? 1.3 : 0,
       );
       vehicle.setWheelFrictionSlip(
         i,
-        (offroad ? 0.65 : 1.65) * (input.handbrake && !front ? 0.38 : 1),
+        (offroad ? 1.35 : 1.65) * (input.handbrake && !front ? 0.38 : 1),
       );
-      vehicle.setWheelSideFrictionStiffness(i, offroad ? 0.65 : 0.95);
+      vehicle.setWheelSideFrictionStiffness(i, offroad ? 0.85 : 0.95);
     }
     const v = Math.hypot(velocity.x, velocity.y, velocity.z);
     if (v > 0.01) {
@@ -107,6 +120,23 @@ export function createDrivingPhysics(world: R.World) {
     world.timestep = dt;
     world.step();
     body.resetForces(true);
+    // Govern the actual planar velocity, including downhill acceleration and impacts.
+    // Vertical motion remains physical so jumps, suspension and falls still behave normally.
+    let finalVelocity = body.linvel();
+    const planarSpeed = Math.hypot(finalVelocity.x, finalVelocity.z);
+    if (planarSpeed > maxSpeed) {
+      const ratio = maxSpeed / planarSpeed;
+      body.setLinvel(
+        { x: finalVelocity.x * ratio, y: finalVelocity.y, z: finalVelocity.z * ratio },
+        true,
+      );
+      finalVelocity = body.linvel();
+    }
+    const finalForward = rotateVector(body.rotation(), { x: 1, y: 0, z: 0 });
+    speed =
+      finalVelocity.x * finalForward.x +
+      finalVelocity.y * finalForward.y +
+      finalVelocity.z * finalForward.z;
     return {
       speed,
       steering,
@@ -132,9 +162,26 @@ export function createDrivingPhysics(world: R.World) {
     body.resetTorques(true);
     steering = throttle = speed = 0;
     reverse = false;
+    boostRemaining = 0;
   }
   function dispose() {
     world.removeVehicleController(vehicle);
   }
-  return { body, vehicle, wheels, step, reset, dispose };
+  return {
+    body,
+    vehicle,
+    wheels,
+    step,
+    reset,
+    dispose,
+    activateBoost() {
+      boostRemaining = BOOST_DURATION;
+    },
+    get boostRemaining() {
+      return boostRemaining;
+    },
+    get speedLimitKmh() {
+      return boostRemaining > 0 ? BOOST_SPEED_KMH : MAX_SPEED_KMH;
+    },
+  };
 }

@@ -6,6 +6,8 @@ export interface DrivingInput {
   left: boolean;
   right: boolean;
   handbrake: boolean;
+  boost?: boolean;
+  walk?: boolean;
 }
 export type InputAction = keyof DrivingInput;
 export interface VectorLike {

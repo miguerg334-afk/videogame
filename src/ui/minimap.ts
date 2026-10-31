@@ -1,8 +1,15 @@
 import { rotateVector } from '../engine/math';
 import type { RouteFrame, VectorLike, QuaternionLike } from '../engine/types';
+import type { MountainTrail } from '../world/trails';
 import { context2D } from './dom';
+import { PLAYABLE_BOUNDS } from '../world/boundary';
 
-export function createMinimap(mapCanvas: HTMLCanvasElement, frames: RouteFrame[]) {
+export function createMinimap(
+  mapCanvas: HTMLCanvasElement,
+  frames: RouteFrame[],
+  trails: MountainTrail[] = [],
+  pickups: { position: { x: number; z: number }; availableAt: number }[] = [],
+) {
   const mapContext = context2D(mapCanvas);
   const N = frames.length - 1,
     start = frames[0];
@@ -11,18 +18,21 @@ export function createMinimap(mapCanvas: HTMLCanvasElement, frames: RouteFrame[]
   mapBase.width = 296;
   mapBase.height = 224;
   const mc = context2D(mapBase),
-    mapBounds = {
-      xmin: Math.min(...frames.map((f) => f.p.x)) - 45,
-      xmax: Math.max(...frames.map((f) => f.p.x)) + 45,
-      zmin: Math.min(...frames.map((f) => f.p.z)) - 45,
-      zmax: Math.max(...frames.map((f) => f.p.z)) + 45,
-    };
+    mapBounds = PLAYABLE_BOUNDS;
   function mapPoint(x: number, z: number) {
     return [
       ((x - mapBounds.xmin) / (mapBounds.xmax - mapBounds.xmin)) * 270 + 13,
       ((z - mapBounds.zmin) / (mapBounds.zmax - mapBounds.zmin)) * 195 + 12,
     ];
   }
+  const [bx, by] = mapPoint(mapBounds.xmin, mapBounds.zmin);
+  mc.fillStyle = '#243e303d';
+  mc.fillRect(bx, by, 270, 195);
+  mc.strokeStyle = '#c0a976';
+  mc.lineWidth = 1.5;
+  mc.setLineDash([4, 5]);
+  mc.strokeRect(bx, by, 270, 195);
+  mc.setLineDash([]);
   mc.lineJoin = 'round';
   mc.lineCap = 'round';
   mc.beginPath();
@@ -36,12 +46,30 @@ export function createMinimap(mapCanvas: HTMLCanvasElement, frames: RouteFrame[]
   mc.strokeStyle = '#a3b9a7';
   mc.lineWidth = 3;
   mc.stroke();
+  for (const trail of trails) {
+    mc.beginPath();
+    trail.frames.forEach((f, i) => {
+      const [x, y] = mapPoint(f.p.x, f.p.z);
+      i ? mc.lineTo(x, y) : mc.moveTo(x, y);
+    });
+    mc.strokeStyle = '#c5a16b';
+    mc.lineWidth = 2;
+    mc.stroke();
+  }
   const startXY = mapPoint(start.p.x, start.p.z);
   mc.fillStyle = '#f1f0d3';
   mc.fillRect(startXY[0] - 3, startXY[1] - 4, 6, 8);
-  function drawMap(p: VectorLike, q: QuaternionLike) {
+  function drawMap(p: VectorLike, q: QuaternionLike, time = 0) {
     mapContext.clearRect(0, 0, 296, 224);
     mapContext.drawImage(mapBase, 0, 0);
+    mapContext.fillStyle = '#65dcff';
+    for (const pickup of pickups) {
+      if (time < pickup.availableAt) continue;
+      const [x, y] = mapPoint(pickup.position.x, pickup.position.z);
+      mapContext.beginPath();
+      mapContext.arc(x, y, 1.8, 0, Math.PI * 2);
+      mapContext.fill();
+    }
     const f = rotateVector(q, { x: 1, y: 0, z: 0 }),
       [x, y] = mapPoint(p.x, p.z);
     mapContext.save();

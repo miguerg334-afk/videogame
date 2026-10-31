@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { createMountainWorld } from '../src/world/mountain.js';
 import { createDrivingPhysics } from '../src/vehicle/physics';
 import { constrainChaseCamera } from '../src/engine/camera';
+import { rotateVector } from '../src/engine/math';
 import { disposeScene } from '../src/engine/dispose';
 
 await R.init();
@@ -66,7 +67,7 @@ test('ruta de montaña: pendientes, túneles transitables y cámara dentro de la
       for (const side of [-1, 1]) {
         const camera = frame.p.clone().addScaledVector(frame.normal, side * 9);
         camera.y += 25;
-        constrainChaseCamera(camera, map);
+        constrainChaseCamera(camera, map, p);
         assert(map.nearestTrack(camera).distance < 5);
         assert(camera.y - map.routeHeight(camera.x, camera.z) < 5);
       }
@@ -117,6 +118,90 @@ test('ruta de montaña: pendientes, túneles transitables y cámara dentro de la
       assert(ascent ? end.y > f.p.y + 4 : end.y < f.p.y - 6);
       assert(minimumClearance > 0.25, 'el chasis permanece sobre el asfalto');
     }
+    const entry = map.trailNetwork.trails[0].frames[0],
+      ahead = map.trailNetwork.trails[0].frames[8];
+    sim.reset(
+      { x: entry.p.x, y: entry.p.y + 0.8, z: entry.p.z },
+      -Math.atan2(ahead.p.z - entry.p.z, ahead.p.x - entry.p.x),
+    );
+    for (let i = 0; i < 600; i++) sim.step({ ...neutral, up: true }, 1 / 120, true);
+    assert(
+      map.nearestTrack(sim.body.translation()).distance > 25,
+      'se sale al interior sin encontrar una defensa invisible',
+    );
+    const outside = map.frames[0];
+    sim.reset(
+      { x: outside.p.x, y: outside.p.y + 0.8, z: outside.p.z },
+      -Math.atan2(outside.normal.z, outside.normal.x),
+    );
+    for (let i = 0; i < 600; i++) sim.step({ ...neutral, up: true }, 1 / 120, true);
+    assert(
+      map.nearestTrack(sim.body.translation()).distance > 25,
+      'se sale también al exterior sin defensas invisibles',
+    );
+    assert(!scene.getObjectByName('corrugated-guardrails'));
+    assert(map.forest.count >= 1700);
+    assert(map.forest.positions.every((p) => map.boundary.distance(p) > 10));
+    assert.equal(map.trailNetwork.trails.length, 3);
+    for (const trail of map.trailNetwork.trails) {
+      const grade = Math.max(...trail.frames.map((f) => Math.abs(f.grade)));
+      console.log(trail.name, { length: trail.length, maximumGrade: grade });
+      assert(grade < 0.45, 'el atajo tiene pendientes transitables');
+      for (const f of [trail.frames[0], trail.frames[trail.frames.length - 1]]) {
+        assert(
+          map.nearestTrack(f.p).distance > 10 && map.nearestTrack(f.p).distance < 14,
+          'el acceso queda en la cuneta interior, fuera del asfalto',
+        );
+        assert(
+          !map.tunnelForIndex(map.nearestTrack(f.p).index),
+          'no desemboca en una pared de túnel',
+        );
+      }
+      const f = trail.frames[18];
+      sim.reset(
+        { x: f.p.x, y: f.p.y + 0.8, z: f.p.z },
+        -Math.atan2(f.tangent.z, f.tangent.x),
+        f.grade,
+      );
+      let reached = 0,
+        minimumY = Infinity;
+      for (let tick = 0; tick < 15000; tick++) {
+        const p = sim.body.translation();
+        const near = map.trailNetwork.sample(p);
+        const current = near.trail === trail ? near.index : reached;
+        reached = Math.max(reached, current);
+        if (reached > trail.frames.length - 12) break;
+        const velocity = sim.body.linvel(),
+          speed = Math.hypot(velocity.x, velocity.z);
+        const target =
+          trail.frames[
+            Math.min(trail.frames.length - 1, current + Math.round((7 + speed * 0.65) / 1.6))
+          ].p;
+        const forward = rotateVector(sim.body.rotation(), { x: 1, y: 0, z: 0 }),
+          dx = target.x - p.x,
+          dz = target.z - p.z;
+        const error = Math.atan2(forward.x * dz - forward.z * dx, forward.x * dx + forward.z * dz);
+        const input = {
+          ...neutral,
+          up: speed < 9,
+          down: speed > 11,
+          left: error < -0.025,
+          right: error > 0.025,
+        };
+        sim.step(input, 1 / 120, true);
+        minimumY = Math.min(minimumY, p.y - map.terrainHeight(p.x, p.z));
+      }
+      console.log('Recorrido', trail.name, {
+        progress: reached / (trail.frames.length - 1),
+        minimumY,
+      });
+      assert(
+        reached > trail.frames.length * 0.9,
+        'se puede recorrer físicamente el atajo de principio a fin',
+      );
+    }
+    for (const tree of map.forest.positions)
+      assert(map.trailNetwork.sample(tree).distance >= 17, 'los accesos no tienen árboles');
   } finally {
     sim.dispose();
     map.world.free();

@@ -6,10 +6,12 @@ import type { createRenderer } from '../engine/renderer';
 import type { createVehicleModel } from '../vehicle/model.js';
 import type { createMountainWorld } from '../world/mountain.js';
 import type { createDrivingPhysics } from '../vehicle/physics';
+import { BOOST_DURATION } from '../vehicle/physics';
 import { createMinimap } from '../ui/minimap';
 import { constrainChaseCamera } from '../engine/camera';
 import { element } from '../ui/dom';
 import { createLifecycle } from './lifecycle';
+import { createPowerups } from '../world/powerups';
 
 type Dependencies = {
   rendering: ReturnType<typeof createRenderer>;
@@ -19,7 +21,7 @@ type Dependencies = {
 };
 
 export function startDriving({ rendering, model, mountain, sim }: Dependencies) {
-  const { stage, scene, renderer, camera, vec, key } = rendering;
+  const { stage, scene, renderer, camera, vec, key, quality } = rendering;
   const { paint, wheelAssemblies, whiteLED, redLED } = model;
   const {
     frames,
@@ -37,6 +39,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     driveGroundHeight,
   } = mountain;
   const { body, vehicle } = sim;
+  const powerups = createPowerups(scene, mountain);
   const lifecycle = createLifecycle();
   const { listen, listenDocument, listenElement } = lifecycle;
   let animationFrame = 0;
@@ -87,6 +90,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
   }
   function setPaused(value: boolean) {
     paused = value;
+    quality.reset();
     clearInput();
     accumulator = 0;
     previousTime = performance.now();
@@ -144,6 +148,10 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
         event.preventDefault();
         resetCar();
       }
+      if (event.code === 'KeyV') {
+        event.preventDefault();
+        visitTrail();
+      }
       if (event.code === 'KeyM') {
         event.preventDefault();
         visitMountain();
@@ -186,6 +194,25 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     notice('Puerto del Alba · Comienza la ascensión');
     stage.focus({ preventScroll: true });
   }
+  let trailDestination = 0;
+  function visitTrail() {
+    const trail =
+      mountain.trailNetwork.trails[trailDestination++ % mountain.trailNetwork.trails.length];
+    const f = trail.frames[18];
+    sim.reset(
+      { x: f.p.x, y: f.p.y + 0.8, z: f.p.z },
+      -Math.atan2(f.tangent.z, f.tangent.x),
+      f.grade,
+    );
+    clearInput();
+    nearest = nearestTrack(f.p);
+    cameraSnapped = false;
+    lapStart = null;
+    lapValid = false;
+    notice('Atajo ' + trail.name + ' · Explora la montaña');
+    stage.focus({ preventScroll: true });
+  }
+  listenElement(element('trails'), 'click', visitTrail);
   listenElement(element('summit'), 'click', visitMountain);
   listenElement(element('lights'), 'click', toggleLights);
   listenElement(element('pause'), 'click', () => setPaused(!paused));
@@ -226,7 +253,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     savedPaint = localStorage.getItem('apex-gt-paint') || savedPaint;
   } catch {}
   selectPaint(savedPaint);
-  const drawMap = createMinimap(mapCanvas, frames);
+  const drawMap = createMinimap(mapCanvas, frames, mountain.trailNetwork.trails, powerups.entries);
   const skidMat = new THREE.MeshBasicMaterial({
       color: 0x111511,
       transparent: true,
@@ -245,7 +272,15 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
   let skidIndex = 0,
     skidAccumulator = 0;
   let lastHud = 0;
+  let measuredFps = 0,
+    frameSeconds = 0,
+    frameCount = 0;
   function updateHUD() {
+    const boost = sim.boostRemaining;
+    element('boost-status').textContent =
+      boost > 0 ? `IMPULSO · 300 KM/H · ${boost.toFixed(1)} s` : '200 KM/H · RECOGE UN RAYO';
+    element('boost-meter').style.width = `${(boost / BOOST_DURATION) * 100}%`;
+    element('boost-panel').classList.toggle('active', boost > 0);
     const velocity = body.linvel(),
       speed = Math.hypot(velocity.x, velocity.z) * 3.6;
     speedEl.textContent = String(Math.round(speed));
@@ -262,7 +297,12 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
         : lastState.contacts === 0
           ? 'EN AIRE'
           : nearest.distance > 4.2
-            ? 'CÉSPED · MENOR AGARRE'
+            ? mountain.trailNetwork.sample(body.translation()).distance < 6
+              ? 'ATAJO · ' +
+                mountain.trailNetwork.sample(body.translation()).trail.name.toUpperCase()
+              : mountain.boundary.distance(body.translation()) < 35
+                ? 'LÍMITE · MURO DE PIEDRA'
+                : 'CAMPO · TRACCIÓN 4×4'
             : input.handbrake
               ? 'FRENO DE MANO'
               : tunnelForIndex(nearest.index)
@@ -286,17 +326,29 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       lightsOn,
       throttle: +lastState.throttle.toFixed(2),
       steer: +lastState.steering.toFixed(3),
+      boostRemaining: +sim.boostRemaining.toFixed(2),
+      speedLimit: sim.speedLimitKmh,
+      fps: measuredFps,
+      drawCalls: renderer.info.render.calls,
+      triangles: renderer.info.render.triangles,
+      pixelRatio: renderer.getPixelRatio(),
       distance: +nearest.distance.toFixed(2),
       altitude: +p.y.toFixed(1),
       grade: +nearest.frame.grade.toFixed(3),
       tunnel: tunnelForIndex(nearest.index)?.name || null,
     });
-    drawMap(body.translation(), body.rotation());
+    drawMap(body.translation(), body.rotation(), simTime);
   }
   function physicsTick(dt: number) {
     nearest = nearestTrack(body.translation());
+    const previousPosition = body.translation();
     lastState = sim.step(input, dt, nearest.distance > 4.2);
+    mountain.boundary.enforce(body);
     simTime += dt;
+    if (powerups.collect(previousPosition, body.translation(), simTime)) {
+      sim.activateBoost();
+      notice(`¡IMPULSO! · Hasta 300 km/h durante ${BOOST_DURATION} s`);
+    }
     if (input.up || input.down) {
       if (lapStart === null) lapStart = simTime;
       if (!firstDrive) {
@@ -366,6 +418,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     redLED.emissiveIntensity = lastState.braking ? 4 : lightsOn ? 1.5 : 0;
     whiteLED.emissiveIntensity = lightsOn ? 4 : 0;
     tailGlow.intensity = lastState.braking ? 1.6 : lightsOn ? 0.85 : 0;
+    powerups.update(simTime);
     sky.position.copy(camera.position);
     const forward = vec(1, 0, 0).applyQuaternion(rigQuat),
       side = vec(0, 0, 1).applyQuaternion(rigQuat);
@@ -375,7 +428,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
         .addScaledVector(forward, -7.8 - Math.min(3, Math.abs(lastState.speed) * 0.06))
         .addScaledVector(side, 0.6);
       cameraPosition.y += 3.4;
-      constrainChaseCamera(cameraPosition, mountain);
+      constrainChaseCamera(cameraPosition, mountain, rig.position);
       cameraTarget.copy(rig.position).addScaledVector(forward, 3.5);
       cameraTarget.y += 0.55;
     } else {
@@ -392,7 +445,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       camera.position.lerp(cameraPosition, 1 - Math.exp(-dt * (cameraMode ? 20 : 5)));
       lookAt.lerp(cameraTarget, 1 - Math.exp(-dt * 8));
     }
-    if (cameraMode === 0) constrainChaseCamera(camera.position, mountain);
+    if (cameraMode === 0) constrainChaseCamera(camera.position, mountain, rig.position);
     camera.lookAt(lookAt);
     camera.fov = 58 + Math.min(8, Math.abs(lastState.speed) * 0.14);
     camera.updateProjectionMatrix();
@@ -403,12 +456,22 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
   }
   function animate(now: number) {
     animationFrame = requestAnimationFrame(animate);
-    const dt = Math.min((now - previousTime) / 1000 || 0, 0.1);
+    const rawDt = (now - previousTime) / 1000 || 0;
+    const dt = Math.min(rawDt, 0.1);
     previousTime = now;
     if (!paused) {
-      accumulator += dt;
+      frameSeconds += rawDt;
+      frameCount++;
+      if (frameSeconds >= 1) {
+        measuredFps = Math.round(frameCount / frameSeconds);
+        frameSeconds = 0;
+        frameCount = 0;
+        element('fps').textContent = measuredFps + ' FPS';
+      }
+      if (quality.sample(rawDt)) renderer.setPixelRatio(quality.ratio);
+      accumulator = Math.min(accumulator + dt, 8 / 120);
       let steps = 0;
-      while (accumulator >= 1 / 120 && steps++ < 12) {
+      while (accumulator >= 1 / 120 && steps++ < 8) {
         physicsTick(1 / 120);
         accumulator -= 1 / 120;
       }
@@ -422,7 +485,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
   listen('resize', () => {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+    renderer.setPixelRatio(quality.ratio);
     renderer.setSize(innerWidth, innerHeight);
     cameraSnapped = false;
   });
@@ -433,6 +496,21 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     element('loadText').textContent =
       'Se perdió el contexto gráfico. Recarga la página para continuar.';
   });
+  // The world is static; only the car, sky and moving light targets need transforms.
+  for (const root of scene.children) {
+    if (
+      root === rig ||
+      root === sky ||
+      root === key.target ||
+      root.name === 'powerup-300' ||
+      root instanceof THREE.Light
+    )
+      continue;
+    root.traverse((object) => {
+      object.updateMatrix();
+      object.matrixAutoUpdate = false;
+    });
+  }
   resetCar(true);
   for (let i = 0; i < 90; i++) sim.step(input, 1 / 120);
   draw(0);

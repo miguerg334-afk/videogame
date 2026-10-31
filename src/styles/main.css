@@ -449,3 +449,36 @@ header {
     top: 210px;
   }
 }
+
+.fps {
+  font-size: 9px;
+  color: #a0b5a8;
+  margin-top: 9px;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+}
+
+.boost-panel {
+  margin-top: 12px;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  color: #9ab7c0;
+}
+.boost-panel.active {
+  color: #7ae5ff;
+}
+.boost-bar {
+  height: 3px;
+  margin-top: 7px;
+  background: #ffffff12;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.boost-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #65ddff;
+  box-shadow: 0 0 8px #65ddff;
+  transition: width 0.1s linear;
+}

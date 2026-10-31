@@ -2,6 +2,12 @@ import * as THREE from 'three';
 import R from '@dimforge/rapier3d-compat/rapier.es.js';
 import { routeAnchors, routeHeight, createRouteLookup } from './route';
 import { createTerrainHeight, createTerrain } from './terrain';
+import { addDistantRanges, addNightSky } from './background';
+import { createTrailNetwork, buildMountainTrails } from './trails';
+import { createForest } from './forest';
+import { createWorldBoundary } from './boundary';
+import { createRoadMaterials } from './road-materials';
+import { createIBeamGeometry, addRoadDetails, detailGantry, addTunnelRibs } from './infrastructure';
 
 /**
  * Build terrain, road colliders, tunnels and night lighting.
@@ -28,26 +34,17 @@ export function createMountainWorld(scene, car, document) {
       envMapIntensity: 0.32,
     });
   }
+  const roadMaterials = createRoadMaterials(document);
+  const { asphalt, shoulder: gravel } = roadMaterials;
   const grass = material(0x758b57),
-    asphalt = material(0x42494b, 0.97),
-    gravel = material(0xb4ac90),
     stripe = material(0xe7e5d4),
     railMat = material(0xb5bfc0, 0.5),
     postMat = material(0x545f5d);
-  const asphaltCanvas = document.createElement('canvas');
-  asphaltCanvas.width = asphaltCanvas.height = 128;
-  const ac = asphaltCanvas.getContext('2d'),
-    pixels = ac.createImageData(128, 128);
-  for (let i = 0; i < pixels.data.length; i += 4) {
-    const v = 100 + Math.floor(random() * 55);
-    pixels.data[i] = pixels.data[i + 1] = pixels.data[i + 2] = v;
-    pixels.data[i + 3] = 255;
-  }
-  ac.putImageData(pixels, 0, 0);
-  const asphaltTexture = new THREE.CanvasTexture(asphaltCanvas);
-  asphaltTexture.wrapS = asphaltTexture.wrapT = THREE.RepeatWrapping;
-  asphaltTexture.repeat.set(3, 145);
-  asphalt.map = asphaltTexture;
+  railMat.metalness = 0.72;
+  railMat.roughness = 0.43;
+  railMat.envMapIntensity = 0.6;
+  stripe.roughness = 0.62;
+  stripe.envMapIntensity = 0.4;
   const curve = new THREE.CatmullRomCurve3(
     routeAnchors.map(([x, z]) => vec(x, 0, z)),
     true,
@@ -94,7 +91,8 @@ export function createMountainWorld(scene, car, document) {
   function tunnelForIndex(index, margin = 0) {
     return tunnelRanges.find((t) => index >= t.start - margin && index <= t.end + margin);
   }
-  const terrainHeight = createTerrainHeight(nearestTrack);
+  const trailNetwork = createTrailNetwork(nearestTrack);
+  const terrainHeight = createTerrainHeight(nearestTrack, trailNetwork);
   /** @param {number} x
    * @param {number} z */
   function driveGroundHeight(x, z) {
@@ -110,7 +108,8 @@ export function createMountainWorld(scene, car, document) {
     return p;
   }
   const terrain = createTerrain(scene, world, terrainHeight);
-  asphaltTexture.repeat.y = trackLength / 5;
+  addDistantRanges(scene);
+  roadMaterials.setLength(trackLength);
   function ribbon(a, b, mat, lift = 0, collider = false, curb = false) {
     const v = [],
       uv = [],
@@ -120,10 +119,10 @@ export function createMountainWorld(scene, car, document) {
       for (const d of [a, b]) {
         const p = offsetPoint(frames[i], d, lift);
         v.push(p.x, p.y, p.z);
-        uv.push(d / 10, i / N);
+        uv.push((d + 5) / 10, i / N);
         if (curb) {
           const c = new THREE.Color(
-            Math.floor(i / 5) % 2 ? 0xe8e2ce : 0xaa4437,
+            Math.floor(i / 4) % 2 ? 0xa6aaa0 : 0x8c948d,
           ).convertSRGBToLinear();
           colors.push(c.r, c.g, c.b);
         }
@@ -153,7 +152,8 @@ export function createMountainWorld(scene, car, document) {
   ribbon(-5, 5, asphalt, 0, true);
   ribbon(-4.83, -4.72, stripe, 0.012);
   ribbon(4.72, 4.83, stripe, 0.012);
-  const curbMat = material(0xffffff);
+  const curbMat = roadMaterials.concrete;
+  curbMat.color.set(0xffffff);
   curbMat.vertexColors = true;
   ribbon(-5.45, -5.02, curbMat, 0.018);
   ribbon(5.02, 5.45, curbMat, 0.018);
@@ -172,82 +172,11 @@ export function createMountainWorld(scene, car, document) {
     dashes.setMatrixAt(i, transform.matrix);
   }
   scene.add(dashes);
-  // Continuous guard rails; collider orientation follows the slope of each segment.
-  const railCount = Math.floor(trackLength / 8),
-    rails = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.42, 0.16), railMat, railCount * 2),
-    posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.12, 0.8, 0.12), postMat, railCount * 2);
-  let railIndex = 0;
-  for (let i = 0; i < railCount; i++) {
-    const f1 = frames[Math.floor((i / railCount) * N)],
-      f2 = frames[Math.floor(((i + 1) / railCount) * N)];
-    for (const side of [-1, 1]) {
-      const a = offsetPoint(f1, side * 7.2),
-        b = offsetPoint(f2, side * 7.2),
-        delta = b.clone().sub(a),
-        length = delta.length(),
-        center = a.clone().add(b).multiplyScalar(0.5);
-      center.y += 0.65;
-      const q = new THREE.Quaternion().setFromUnitVectors(vec(1, 0, 0), delta.normalize());
-      transform.position.copy(center);
-      transform.quaternion.copy(q);
-      transform.scale.set(length + 0.08, 1, 1);
-      transform.updateMatrix();
-      rails.setMatrixAt(railIndex, transform.matrix);
-      world.createCollider(
-        R.ColliderDesc.cuboid(length / 2 + 0.04, 0.26, 0.11)
-          .setTranslation(center.x, center.y, center.z)
-          .setRotation(q)
-          .setFriction(0.28)
-          .setRestitution(0.08),
-      );
-      transform.position.copy(a);
-      transform.position.y += 0.4;
-      transform.quaternion.identity();
-      transform.scale.set(1, 1, 1);
-      transform.updateMatrix();
-      posts.setMatrixAt(railIndex, transform.matrix);
-      railIndex++;
-    }
-  }
-  rails.castShadow = true;
-  posts.castShadow = true;
-  scene.add(rails, posts);
-  // Trees are instanced and kept away from the road and escape shoulders.
-  const treePositions = [];
-  for (let attempts = 0; attempts < 6500 && treePositions.length < 1000; attempts++) {
-    const x = -1150 + random() * 3300,
-      z = -1300 + random() * 2350;
-    if (nearestTrack({ x, z }).distance > 25) treePositions.push({ x, z, h: 3.2 + random() * 4.5 });
-  }
-  const foliageMat = material(0x3e654b),
-    trunkMat = material(0x655343),
-    foliage = new THREE.InstancedMesh(
-      new THREE.ConeGeometry(1, 1, 7),
-      foliageMat,
-      treePositions.length * 2,
-    ),
-    trunks = new THREE.InstancedMesh(
-      new THREE.CylinderGeometry(0.12, 0.18, 1, 6),
-      trunkMat,
-      treePositions.length,
-    );
-  for (let i = 0; i < treePositions.length; i++) {
-    const p = treePositions[i],
-      y = terrainHeight(p.x, p.z);
-    transform.position.set(p.x, y + p.h * 0.35, p.z);
-    transform.rotation.set(0, random() * Math.PI, 0);
-    transform.scale.set(1, p.h * 0.7, 1);
-    transform.updateMatrix();
-    trunks.setMatrixAt(i, transform.matrix);
-    for (let j = 0; j < 2; j++) {
-      transform.position.set(p.x, y + p.h * (0.55 + j * 0.22), p.z);
-      transform.scale.set(p.h * (0.31 - j * 0.085), p.h * 0.72, p.h * (0.31 - j * 0.085));
-      transform.updateMatrix();
-      foliage.setMatrixAt(i * 2 + j, transform.matrix);
-    }
-  }
-  foliage.castShadow = true;
-  scene.add(foliage, trunks);
+  // Both verges remain open for mountain exploration.
+  addRoadDetails(scene, frames, offsetPoint, trackLength);
+  buildMountainTrails(scene, world, trailNetwork, document);
+  const forest = createForest(scene, world, document, terrainHeight, nearestTrack, trailNetwork);
+  const boundary = createWorldBoundary(scene, world, terrainHeight);
   // Starting line and a lightweight track gantry.
   const start = frames[0];
   for (let a = 0; a < 10; a++)
@@ -269,13 +198,15 @@ export function createMountainWorld(scene, car, document) {
   gantry.rotation.y = -Math.atan2(start.tangent.z, start.tangent.x);
   const beamMat = material(0x233a33);
   for (const z of [-6.3, 6.3]) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(0.22, 5, 0.22), beamMat);
+    const m = new THREE.Mesh(createIBeamGeometry(0.3, 5, 0.3, 0.035, 0.05), railMat);
     m.position.set(0, 2.5, z);
     gantry.add(m);
   }
-  const beam = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.65, 12.8), beamMat);
+  const beam = new THREE.Mesh(createIBeamGeometry(0.32, 12.8, 0.65, 0.045, 0.065), railMat);
+  beam.rotation.x = Math.PI / 2;
   beam.position.y = 4.8;
   gantry.add(beam);
+  detailGantry(gantry);
   scene.add(gantry);
   const bannerCanvas = document.createElement('canvas');
   bannerCanvas.width = 1024;
@@ -363,12 +294,11 @@ export function createMountainWorld(scene, car, document) {
     shell.castShadow = true;
     shell.receiveShadow = true;
     scene.add(shell);
-    if (!outer)
-      world.createCollider(
-        R.ColliderDesc.trimesh(new Float32Array(vertices), new Uint32Array(indices)).setFriction(
-          0.5,
-        ),
-      );
+    // Both visible shells are solid: outside driving and camera rays must meet
+    // the same surface that is rendered, including the rock cover and roof.
+    world.createCollider(
+      R.ColliderDesc.trimesh(new Float32Array(vertices), new Uint32Array(indices)).setFriction(0.5),
+    );
     return cross;
   }
   const portalLampMaterial = new THREE.MeshStandardMaterial({
@@ -418,7 +348,9 @@ export function createMountainWorld(scene, car, document) {
       );
       plate.position.copy(frame.p);
       plate.position.y += 6.25;
-      plate.rotation.y = -Math.atan2(frame.tangent.z, frame.tangent.x) + Math.PI / 2;
+      plate.rotation.y =
+        -Math.atan2(frame.tangent.z, frame.tangent.x) +
+        (index === range.start ? -Math.PI / 2 : Math.PI / 2);
       scene.add(plate);
     }
     let lastDistance = -100;
@@ -446,6 +378,7 @@ export function createMountainWorld(scene, car, document) {
       }
     }
   }
+  addTunnelRibs(scene, frames, tunnelRanges, offsetPoint, trackLength);
   // Se reutilizan cuatro luces próximas al vehículo para controlar el coste de renderizado.
   const tunnelLightPool = Array.from({ length: 4 }, () => {
     const light = new THREE.PointLight(0xffcb8b, 0, 24, 2);
@@ -477,6 +410,7 @@ export function createMountainWorld(scene, car, document) {
   // Cielo distante: la luna mantiene una dirección fija mientras el coche avanza.
   const sky = new THREE.Group();
   scene.add(sky);
+  addNightSky(sky);
   const moonCanvas = document.createElement('canvas');
   moonCanvas.width = moonCanvas.height = 256;
   const moonContext = moonCanvas.getContext('2d');
@@ -498,10 +432,10 @@ export function createMountainWorld(scene, car, document) {
   const moonTexture = new THREE.CanvasTexture(moonCanvas);
   moonTexture.encoding = THREE.sRGBEncoding;
   const moon = new THREE.Mesh(
-    new THREE.SphereGeometry(13, 40, 24),
+    new THREE.SphereGeometry(38, 48, 32),
     new THREE.MeshBasicMaterial({ map: moonTexture, color: 0xf1f3ff, fog: false }),
   );
-  moon.position.set(300, 45, 75);
+  moon.position.set(1900, 580, -280);
   sky.add(moon);
   const haloCanvas = document.createElement('canvas');
   haloCanvas.width = haloCanvas.height = 128;
@@ -522,16 +456,16 @@ export function createMountainWorld(scene, car, document) {
     }),
   );
   halo.position.copy(moon.position);
-  halo.scale.set(85, 85, 1);
+  halo.scale.set(205, 205, 1);
   sky.add(halo);
   const starPositions = [];
   for (let i = 0; i < 700; i++) {
     const angle = random() * Math.PI * 2,
       elevation = 0.13 + random() * 1.35;
     starPositions.push(
-      Math.cos(angle) * Math.cos(elevation) * 420,
-      Math.sin(elevation) * 420,
-      Math.sin(angle) * Math.cos(elevation) * 420,
+      Math.cos(angle) * Math.cos(elevation) * 6100,
+      Math.sin(elevation) * 6100,
+      Math.sin(angle) * Math.cos(elevation) * 6100,
     );
   }
   const starsGeometry = new THREE.BufferGeometry();
@@ -541,11 +475,11 @@ export function createMountainWorld(scene, car, document) {
       starsGeometry,
       new THREE.PointsMaterial({
         color: 0xc5d8ff,
-        size: 1.2,
+        size: 7,
         sizeAttenuation: true,
         fog: false,
         transparent: true,
-        opacity: 0.75,
+        opacity: 0.63,
       }),
     ),
   );
@@ -571,31 +505,6 @@ export function createMountainWorld(scene, car, document) {
   const tailGlow = new THREE.PointLight(0xff2510, 0.85, 4.2, 2);
   tailGlow.position.set(-2.32, 0.03, 0);
   rig.add(tailGlow);
-  // Balizas reflectantes discretas para que se lea el circuito a la luz de la luna.
-  const reflectorMaterial = new THREE.MeshStandardMaterial({
-    color: 0xd3e3eb,
-    emissive: 0x7496c8,
-    emissiveIntensity: 0.24,
-    roughness: 0.35,
-  });
-  const reflectors = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(0.06, 0.14, 0.14),
-    reflectorMaterial,
-    railCount * 2,
-  );
-  let reflectorIndex = 0;
-  for (let i = 0; i < railCount; i++) {
-    const frame = frames[Math.floor((i / railCount) * N)];
-    for (const side of [-1, 1]) {
-      transform.position.copy(offsetPoint(frame, side * 7.05, 0.7));
-      transform.rotation.set(0, 0, 0);
-      transform.scale.set(1, 1, 1);
-      transform.updateMatrix();
-      reflectors.setMatrixAt(reflectorIndex++, transform.matrix);
-    }
-  }
-  scene.add(reflectors);
-
   return {
     world,
     frames,
@@ -617,6 +526,9 @@ export function createMountainWorld(scene, car, document) {
     tunnelRanges,
     terrain,
     terrainHeight,
+    trailNetwork,
+    forest,
+    boundary,
     mountainStart: frames.findIndex((f) => f.p.x > 810 && f.p.z > 100),
   };
 }
