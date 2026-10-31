@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+    <meta name="theme-color" content="#152321" />
+    <meta
+      name="description"
+      content="Un viaje nocturno por la sierra: conducción libre entre montañas y túneles."
+    />
+    <title>APEX — Night Drive</title>
+  </head>
+  <body>
+    <div
+      id="stage"
+      tabindex="0"
+      aria-label="Circuito 3D. Usa las flechas para conducir, espacio para el freno de mano y R para volver a la pista."
+    ></div>
+    <header>
+      <div class="brand">APEX<b> /</b></div>
+      <div class="eyebrow">Sierra · Gran ruta<br />Ruta nocturna</div>
+    </header>
+    <div class="controls">
+      <button id="summit" title="Ir al comienzo de la subida al Puerto del Alba">
+        M · Montaña
+      </button>
+      <button id="lights" aria-pressed="true" aria-label="Encender o apagar las luces">
+        L · Luces</button
+      ><button id="camera" aria-label="Cambiar cámara">C · Cámara</button
+      ><button id="reset">R · Volver</button
+      ><button id="pause" aria-pressed="false">P · Pausa</button>
+    </div>
+    <div class="map-wrap">
+      <canvas id="map" width="296" height="224" aria-label="Mapa del circuito"></canvas>
+      <div class="lap"><span id="lap">VUELTA 01</span><span id="timer">00:00.0</span></div>
+    </div>
+    <div class="paint-picker" role="group" aria-label="Color del auto">
+      <span>PINTURA</span
+      ><button
+        class="paint-swatch"
+        style="--paint: #b9c99b"
+        data-paint="#b9c99b"
+        aria-label="Verde salvia"
+        aria-pressed="true"
+      ></button
+      ><button
+        class="paint-swatch"
+        style="--paint: #9e1728"
+        data-paint="#9e1728"
+        aria-label="Rojo carmín"
+        aria-pressed="false"
+      ></button
+      ><button
+        class="paint-swatch"
+        style="--paint: #c6ced3"
+        data-paint="#c6ced3"
+        aria-label="Plata"
+        aria-pressed="false"
+      ></button
+      ><button
+        class="paint-swatch"
+        style="--paint: #244f73"
+        data-paint="#244f73"
+        aria-label="Azul atlántico"
+        aria-pressed="false"
+      ></button>
+    </div>
+    <div class="telemetry" aria-label="Telemetría de conducción">
+      <div class="speed-row">
+        <span id="speed" class="speed">0</span><span class="unit">KM/H</span>
+      </div>
+      <div id="gear" class="gear">N · DETENIDO</div>
+      <div class="bar"><i id="power"></i></div>
+      <div id="surface" class="surface">EN PISTA</div>
+    </div>
+    <div class="instructions" id="instructions">
+      <span><kbd>↑ ↓</kbd> Acelera / frena</span><span><kbd>← →</kbd> Dirección</span
+      ><span><kbd>ESPACIO</kbd> Freno de mano</span>
+    </div>
+    <div class="touch left">
+      <button data-key="left" aria-label="Girar a la izquierda">←</button
+      ><button data-key="right" aria-label="Girar a la derecha">→</button>
+    </div>
+    <div class="touch right">
+      <button data-key="down" aria-label="Frenar o retroceder">↓</button
+      ><button data-key="up" aria-label="Acelerar">↑</button>
+    </div>
+    <div id="notice" class="notice" role="status"></div>
+    <div id="pauseOverlay" class="pause-overlay">
+      <strong>En pausa</strong><button id="resume">Continuar</button>
+    </div>
+    <div id="loading" class="loading" role="status">
+      <strong>APEX / DRIVE</strong
+      ><span id="loadText">Construyendo el circuito y preparando la física…</span>
+    </div>
+    <output id="stats" aria-hidden="true"></output>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
