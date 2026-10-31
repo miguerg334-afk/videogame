@@ -4,7 +4,6 @@ import R from '@dimforge/rapier3d-compat/rapier.es.js';
 import * as THREE from 'three';
 import { createMountainWorld } from '../src/world/mountain.js';
 import { createDrivingPhysics } from '../src/vehicle/physics';
-import { constrainChaseCamera } from '../src/engine/camera';
 import { rotateVector } from '../src/engine/math';
 import { disposeScene } from '../src/engine/dispose';
 
@@ -21,12 +20,19 @@ const canvasDocument = {
   createElement: () => ({ width: 0, height: 0, getContext: () => context }),
 } as unknown as Document;
 
-test('ruta de montaña: pendientes, túneles transitables y cámara dentro de la galería', () => {
+test('ruta de montaña: pendientes, carretera abierta y atajos transitables', () => {
   const scene = new THREE.Scene();
   const map = createMountainWorld(scene, new THREE.Group(), canvasDocument);
   const sim = createDrivingPhysics(map.world);
   const neutral = { up: false, down: false, left: false, right: false, handbrake: false };
   try {
+    const lights: THREE.Light[] = [];
+    scene.traverse((object) => {
+      if (object instanceof THREE.Light) lights.push(object);
+      assert(!/tunnel/i.test(object.name), 'el mundo no conserva ninguna estructura de túnel');
+    });
+    assert(lights.length <= 2, 'la escena mantiene el presupuesto de luces locales');
+    assert(map.terrain.lod.farTriangles < map.terrain.lod.nearTriangles * 0.4);
     const heights = map.frames.map((f) => f.p.y);
     assert(map.trackLength > 5000);
     assert(Math.max(...heights) - Math.min(...heights) > 220);
@@ -52,36 +58,18 @@ test('ruta de montaña: pendientes, túneles transitables y cámara dentro de la
       );
       assert(Math.abs(map.nearestTrack(point).distance - reference) < 1e-8);
     }
-    assert.equal(map.tunnelRanges.length, 2);
-    for (const tunnel of map.tunnelRanges) {
-      const frame = map.frames[Math.round((tunnel.start + tunnel.end) / 2)];
-      sim.reset(
-        { x: frame.p.x, y: frame.p.y + 0.7, z: frame.p.z },
-        -Math.atan2(frame.tangent.z, frame.tangent.x),
-        frame.grade,
-      );
-      for (let i = 0; i < 240; i++) sim.step(neutral, 1 / 120);
-      const p = sim.body.translation();
-      assert.equal(sim.wheels.filter((_, i) => sim.vehicle.wheelIsInContact(i)).length, 4);
-      assert(p.y - map.routeHeight(p.x, p.z) > 0.3 && p.y - map.routeHeight(p.x, p.z) < 0.9);
-      for (const side of [-1, 1]) {
-        const camera = frame.p.clone().addScaledVector(frame.normal, side * 9);
-        camera.y += 25;
-        constrainChaseCamera(camera, map, p);
-        assert(map.nearestTrack(camera).distance < 5);
-        assert(camera.y - map.routeHeight(camera.x, camera.z) < 5);
-      }
-    }
-    const first = map.tunnelRanges[0],
-      frame = map.frames[first.start - 25];
+    const frame = map.frames.find((f) => f.p.x > -160 && f.p.x < -157 && f.p.z > 155)!;
     sim.reset(
       { x: frame.p.x, y: frame.p.y + 0.7, z: frame.p.z },
       -Math.atan2(frame.tangent.z, frame.tangent.x),
       frame.grade,
     );
     for (let i = 0; i < 1800; i++) sim.step({ ...neutral, up: true }, 1 / 120);
-    assert(sim.body.translation().x > map.frames[first.end].p.x, 'cruza el primer túnel');
-    const down = map.frames[map.tunnelRanges[1].start + 20];
+    assert(
+      sim.body.translation().x > 80,
+      'cruza el tramo norte sin chocar con restos de la galería',
+    );
+    const down = map.frames.find((f) => f.p.x > 200 && f.p.x < 203 && f.p.z < -305)!;
     sim.reset(
       { x: down.p.x, y: down.p.y + 0.7, z: down.p.z },
       -Math.atan2(down.tangent.z, down.tangent.x),
@@ -140,7 +128,7 @@ test('ruta de montaña: pendientes, túneles transitables y cámara dentro de la
       'se sale también al exterior sin defensas invisibles',
     );
     assert(!scene.getObjectByName('corrugated-guardrails'));
-    assert(map.forest.count >= 1700);
+    assert.equal(map.forest.count, 800);
     assert(map.forest.positions.every((p) => map.boundary.distance(p) > 10));
     assert.equal(map.trailNetwork.trails.length, 3);
     for (const trail of map.trailNetwork.trails) {
@@ -151,10 +139,6 @@ test('ruta de montaña: pendientes, túneles transitables y cámara dentro de la
         assert(
           map.nearestTrack(f.p).distance > 10 && map.nearestTrack(f.p).distance < 14,
           'el acceso queda en la cuneta interior, fuera del asfalto',
-        );
-        assert(
-          !map.tunnelForIndex(map.nearestTrack(f.p).index),
-          'no desemboca en una pared de túnel',
         );
       }
       const f = trail.frames[18];

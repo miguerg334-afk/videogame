@@ -6,10 +6,10 @@ Un juego de conducción 3D para navegador, con carreteras de montaña, exploraci
 
 - **Persecución dinámica:** la patrulla busca interceptar tu posición actual y anticipa tu movimiento. Puede elegir rutas en ambos sentidos y usar los atajos.
 - **Choques con margen para escapar:** un golpe no termina la partida. La policía necesita mantener **5 segundos de contacto** para atraparte; separarte reinicia la captura. Una cuenta atrás muestra el peligro.
-- **Dificultad progresiva:** la intensidad aumenta cada 30 segundos. Tu velocidad máxima pasa de **100 a 120 km/h** y la patrulla tiene **6 km/h de ventaja**, hasta 126 km/h.
+- **Dificultad progresiva:** la intensidad aumenta cada 30 segundos. Tu velocidad máxima pasa de **100 a 120 km/h** y el máximo de la patrulla aumenta de **106 a 135 km/h**.
 - **Física compartida:** ambos coches tienen suspensión por rueda, motor, frenos, agarre y colisiones reales. Pueden perder velocidad, derrapar, saltar y volcar. Puedes enderezar tu coche en el mismo sitio; la patrulla también se recupera tras quedar volcada.
-- **Montaña explorable:** un circuito de unos **5,2 km**, dos túneles, subidas y bajadas de hasta el 27 %, tres atajos de tierra y un entorno de **3,8 × 2,9 km** con 1.800 árboles.
-- **Ambiente nocturno:** luna visible, cordilleras, faros con encendido manual y luces policiales animadas.
+- **Montaña explorable:** un circuito de unos **5,2 km**, subidas y bajadas de hasta el 27 %, tres atajos de tierra y un entorno de **3,8 × 2,9 km** con 800 árboles.
+- **Ambiente nocturno:** luna visible, cordilleras, faros con encendido manual, luces policiales animadas y carretera a cielo abierto.
 - **Tu manera de conducir:** pintura configurable, cuatro cámaras exteriores, retrovisor, minimapa, indicador de la patrulla y controles táctiles.
 
 ## Capturas
@@ -18,7 +18,7 @@ Un juego de conducción 3D para navegador, con carreteras de montaña, exploraci
 | --- | --- |
 | ![Coche deportivo en la carretera nocturna, con luna y un túnel al fondo](docs/images/luna-y-carretera.png) | ![Coche explorando una ladera con árboles y los faros encendidos](docs/images/exploracion-montanas.png) |
 
-*Capturas de distintas etapas del desarrollo; la interfaz ha evolucionado.*
+*Capturas del desarrollo; muestran una versión anterior del escenario y la interfaz.*
 
 ## Con qué se hizo
 
@@ -36,7 +36,7 @@ El coche y buena parte del escenario se construyen mediante geometría y textura
 
 La IA combina una predicción del movimiento del jugador con una búsqueda de rutas sobre la carretera y los caminos. La navegación da instrucciones de dirección, acelerador y freno: el desplazamiento del coche lo resuelve la física.
 
-Para reducir el trabajo gráfico se utilizan sectores de terreno, descarte fuera de cámara, niveles de detalle en los árboles, geometrías compartidas y resolución adaptativa. Las colisiones de los troncos se activan cerca de cualquiera de los dos coches. Ambos vehículos se simulan juntos en un único paso del mundo físico.
+Para reducir el trabajo gráfico se utilizan sectores de terreno, descarte fuera de cámara, niveles de detalle en montañas y árboles, geometrías compartidas y resolución adaptativa. El escenario está abierto, sin túneles; el coche usa dos luces locales dinámicas. Las colisiones de los troncos se activan cerca de cualquiera de los dos coches. Ambos vehículos se simulan juntos en un único paso del mundo físico.
 
 ## Controles
 

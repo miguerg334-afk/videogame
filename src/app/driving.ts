@@ -41,8 +41,6 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     headlamps,
     tailGlow,
     sunOffset,
-    updateTunnelLights,
-    tunnelForIndex,
     driveGroundHeight,
   } = mountain;
   const { body, vehicle } = sim;
@@ -414,13 +412,11 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
                 : 'CAMPO · TRACCIÓN 4×4'
             : input.handbrake
               ? 'FRENO DE MANO'
-              : tunnelForIndex(nearest.index)
-                ? 'TÚNEL · FAROS L'
-                : Math.abs(nearest.frame.grade) > 0.035
-                  ? (nearest.frame.grade > 0 ? 'SUBIDA · ' : 'BAJADA · ') +
-                    Math.round(Math.abs(nearest.frame.grade) * 100) +
-                    '%'
-                  : 'EN PISTA';
+              : Math.abs(nearest.frame.grade) > 0.035
+                ? (nearest.frame.grade > 0 ? 'SUBIDA · ' : 'BAJADA · ') +
+                  Math.round(Math.abs(nearest.frame.grade) * 100) +
+                  '%'
+                : 'EN PISTA';
     const seconds = lapStart === null ? 0 : simTime - lapStart;
     timerEl.textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${(seconds % 60).toFixed(1).padStart(4, '0')}`;
     element('lap').textContent = `VUELTA ${String(lap).padStart(2, '0')}`;
@@ -452,7 +448,6 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       distance: +nearest.distance.toFixed(2),
       altitude: +p.y.toFixed(1),
       grade: +nearest.frame.grade.toFixed(3),
-      tunnel: tunnelForIndex(nearest.index)?.name || null,
     });
     const q = body.rotation();
     hudPlayer.set(target.x, target.y, target.z);
@@ -609,7 +604,6 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     camera.updateProjectionMatrix();
     key.position.copy(rig.position).add(sunOffset);
     key.target.position.copy(rig.position);
-    updateTunnelLights(rig.position);
     updateMovingTransforms();
     renderer.render(scene, camera);
   }

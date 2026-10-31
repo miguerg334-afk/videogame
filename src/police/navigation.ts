@@ -17,7 +17,7 @@ export function createPursuitNavigation(map: MapRoutes) {
   function clearSegment(a: VectorLike, b: VectorLike) {
     const length = Math.hypot(b.x - a.x, b.z - a.z);
     if (length < 0.1) return Math.abs(a.y - b.y) < 2;
-    // Do not connect stacked surfaces, e.g. the tunnel interior and its roof.
+    // Do not connect stacked surfaces, e.g. the ground and an elevated platform.
     if (Math.abs(a.y - ground(a.x, a.z) - 0.7) > 2 || Math.abs(b.y - ground(b.x, b.z) - 0.7) > 2)
       return false;
     const steps = Math.max(1, Math.ceil(length / 6));

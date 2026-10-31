@@ -36,14 +36,6 @@ export interface RouteFrame {
   t: number;
   grade: number;
 }
-export interface TunnelRange {
-  name: string;
-  from: number;
-  to: number;
-  north: boolean;
-  start: number;
-  end: number;
-}
 export interface WheelAssembly {
   pivot: import('three').Group;
   roll: import('three').Group;

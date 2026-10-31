@@ -19,15 +19,15 @@ export function createForest(
     return seed / 4294967296;
   };
   const positions: { x: number; y: number; z: number; h: number; pine: boolean }[] = [];
-  for (let attempt = 0; attempt < 24000 && positions.length < 1800; attempt++) {
+  for (let attempt = 0; attempt < 24000 && positions.length < 800; attempt++) {
     let x: number, z: number;
-    if (positions.length < 650) {
+    if (positions.length < 300) {
       const trail = trails.trails[Math.floor(random() * trails.trails.length)];
       const frame = trail.frames[Math.floor(random() * trail.frames.length)];
       const side = (random() < 0.5 ? -1 : 1) * (22 + random() * 95);
       x = frame.p.x + frame.normal.x * side + frame.tangent.x * (random() - 0.5) * 20;
       z = frame.p.z + frame.normal.z * side + frame.tangent.z * (random() - 0.5) * 20;
-    } else if (positions.length < 1400) {
+    } else if (positions.length < 620) {
       const trail = trails.trails[Math.floor(random() * trails.trails.length)];
       const frame = trail.frames[Math.floor(random() * trail.frames.length)];
       const road = nearestTrack(frame.p).frame;
@@ -79,13 +79,9 @@ export function createForest(
     roughness: 1,
     envMapIntensity: 0.22,
   });
-  const leaf = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    roughness: 1,
-    envMapIntensity: 0.25,
-  });
+  const leaf = new THREE.MeshLambertMaterial({ color: 0xffffff });
   const trunks = new THREE.InstancedMesh(
-    new THREE.CylinderGeometry(0.14, 0.25, 1, 8),
+    new THREE.CylinderGeometry(0.14, 0.25, 1, 6),
     wood,
     positions.length,
   );
@@ -97,9 +93,9 @@ export function createForest(
   const foliage = new THREE.InstancedMesh(
     new THREE.IcosahedronGeometry(1, 0),
     leaf,
-    positions.length * 16,
+    positions.length * 9,
   );
-  const tips = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 8), leaf, positions.length);
+  const tips = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 6), leaf, positions.length);
   const object = new THREE.Object3D();
   let branchCount = 0,
     leafCount = 0,
@@ -112,11 +108,11 @@ export function createForest(
     object.scale.set(1, p.h * 0.96, 1);
     object.updateMatrix();
     trunks.setMatrixAt(index, object.matrix);
-    for (let tier = 0; tier < 4; tier++) {
-      const fraction = 0.33 + tier * 0.16,
-        radius = p.pine ? p.h * (0.27 - tier * 0.046) : p.h * (0.19 + Math.sin(tier) * 0.045);
-      for (let arm = 0; arm < 4; arm++) {
-        const a = yaw + (arm * Math.PI) / 2 + tier * 0.87;
+    for (let tier = 0; tier < 3; tier++) {
+      const fraction = 0.33 + tier * 0.23,
+        radius = p.pine ? p.h * (0.27 - tier * 0.065) : p.h * (0.19 + Math.sin(tier) * 0.045);
+      for (let arm = 0; arm < 3; arm++) {
+        const a = yaw + (arm * Math.PI * 2) / 3 + tier * 0.87;
         object.position.set(
           p.x + Math.cos(a) * radius * 0.5,
           p.y + p.h * fraction,

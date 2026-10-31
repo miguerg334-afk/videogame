@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as THREE from 'three';
-import { tileSurface, addForestLOD } from '../src/world/visibility';
+import { tileSurface, addForestLOD, addTerrainLOD } from '../src/world/visibility';
 import { createAdaptiveQuality, renderRatioLimit } from '../src/engine/quality';
 
 test('los sectores conservan cada triángulo del terreno y sus atributos', () => {
@@ -102,6 +102,9 @@ test('resolución adaptativa: limita píxeles, reacciona a 14 FPS y respeta el t
   );
   for (let i = 0; i < 2000; i++) quality.sample(1 / 90);
   assert(quality.ratio > cap * 0.6 && quality.ratio <= cap);
+  const stalled = createAdaptiveQuality(cap);
+  for (let i = 0; i < 12; i++) stalled.sample(0.4);
+  assert(stalled.ratio < cap, 'los tirones de más de 250 ms también reducen la carga');
   quality.reset();
   const ratio = quality.ratio;
   quality.sample(5);
@@ -111,4 +114,51 @@ test('resolución adaptativa: limita píxeles, reacciona a 14 FPS y respeta el t
     3840 * 2160 * quality.ratio ** 2 <= 960 * 600 + 1,
     'el redimensionado conserva el presupuesto',
   );
+});
+
+test('el terreno lejano reduce triángulos sin cambiar las alturas ni abrir bordes entre niveles', () => {
+  const scene = new THREE.Scene(),
+    geometry = new THREE.PlaneGeometry(800, 800, 80, 80);
+  geometry.rotateX(-Math.PI / 2);
+  const positions = geometry.getAttribute('position');
+  for (let i = 0; i < positions.count; i++)
+    positions.setY(
+      i,
+      Math.sin(positions.getX(i) / 80) * 12 + Math.cos(positions.getZ(i) / 100) * 8,
+    );
+  geometry.computeVertexNormals();
+  const tiles = tileSurface(scene, new THREE.Mesh(geometry, new THREE.MeshStandardMaterial()), 200);
+  const counts = addTerrainLOD(scene, tiles);
+  assert(counts.farTriangles < counts.nearTriangles * 0.45);
+  for (const root of scene.children) {
+    const lod = root as THREE.LOD;
+    if (!lod.isLOD) continue;
+    const high = lod.levels[0].object as THREE.Mesh,
+      low = lod.levels[1].object as THREE.Mesh;
+    assert.equal(
+      high.geometry.getAttribute('position'),
+      low.geometry.getAttribute('position'),
+      'se reutilizan los mismos vértices, alturas y normales',
+    );
+    const p = high.geometry.getAttribute('position'),
+      used = new Set(Array.from(low.geometry.index!.array));
+    const xs = Array.from({ length: p.count }, (_, i) => p.getX(i)),
+      zs = Array.from({ length: p.count }, (_, i) => p.getZ(i));
+    const xmin = Math.min(...xs),
+      xmax = Math.max(...xs),
+      zmin = Math.min(...zs),
+      zmax = Math.max(...zs);
+    for (let i = 0; i < p.count; i++)
+      if (p.getX(i) === xmin || p.getX(i) === xmax || p.getZ(i) === zmin || p.getZ(i) === zmax)
+        assert(used.has(i), 'cada vértice del borde coincide con el nivel detallado vecino');
+    const camera = new THREE.PerspectiveCamera();
+    camera.position.copy(lod.position);
+    camera.updateMatrixWorld();
+    lod.update(camera);
+    assert(high.visible && !low.visible);
+    camera.position.x += 900;
+    camera.updateMatrixWorld();
+    lod.update(camera);
+    assert(!high.visible && low.visible);
+  }
 });

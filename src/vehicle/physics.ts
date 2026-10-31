@@ -7,7 +7,7 @@ import { pursuitSpeedLimitKmh } from '../engine/speed';
 export { MAX_SPEED_KMH } from '../engine/speed';
 
 export function createDrivingPhysics(world: R.World, speedCeiling = pursuitSpeedLimitKmh) {
-  // CCD may need more than one impact in a step at tunnel walls or rough ground.
+  // CCD may need more than one impact in a step at walls or rough ground.
   world.integrationParameters.maxCcdSubsteps = 4;
   const body = world.createRigidBody(
     R.RigidBodyDesc.dynamic()

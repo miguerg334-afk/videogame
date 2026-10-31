@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import R from '@dimforge/rapier3d-compat/rapier.es.js';
 import { rotateVector } from '../engine/math';
 
-/** Upright on the current physical surface, including a tunnel floor or its roof. */
+/** Upright on the current physical surface, including slopes and raised platforms. */
 export function recoveryPose(
   world: R.World,
   body: R.RigidBody,

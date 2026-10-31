@@ -67,19 +67,25 @@ const ctx = new Proxy(
 const document = {
   createElement: () => ({ width: 0, height: 0, getContext: () => ctx }),
 } as unknown as Document;
-test('enderezar dentro y encima del túnel usa la superficie real sin reiniciar la persecución', () => {
+test('enderezar en los tramos abiertos usa el suelo real y conserva la persecución', () => {
   const scene = new THREE.Scene(),
-    map = createMountainWorld(scene, new THREE.Group(), document),
-    sim = createDrivingPhysics(map.world),
-    police = createPursuit(map.world);
-  const f = map.frames[Math.round((map.tunnelRanges[0].start + map.tunnelRanges[0].end) / 2)];
+    map = createMountainWorld(scene, new THREE.Group(), document);
+  const sim = createDrivingPhysics(map.world),
+    police = createPursuit(map.world, map.driveGroundHeight);
   police.reset([
-    { x: f.p.x - 55, y: f.p.y + 0.7, z: f.p.z },
-    { x: f.p.x, y: f.p.y + 0.7, z: f.p.z },
+    { x: -500, y: map.driveGroundHeight(-500, 180) + 0.7, z: 180 },
+    { x: -450, y: map.driveGroundHeight(-450, 180) + 0.7, z: 180 },
   ]);
   try {
-    for (const roof of [false, true]) {
-      sim.reset({ x: f.p.x, y: f.p.y + (roof ? 8 : 1.1), z: f.p.z }, 0);
+    for (const north of [true, false]) {
+      const f = map.frames
+        .filter((f) => (north ? f.p.z > 155 : f.p.z < -305))
+        .reduce((a, b) => (Math.abs(a.p.x + 30) < Math.abs(b.p.x + 30) ? a : b));
+      sim.reset(
+        { x: f.p.x, y: f.p.y + 0.8, z: f.p.z },
+        -Math.atan2(f.tangent.z, f.tangent.x),
+        f.grade,
+      );
       for (let tick = 0; tick < 180; tick++) {
         police.step(1 / 120, sim.body.translation(), true);
         sim.step(neutral, 1 / 120);
@@ -89,14 +95,12 @@ test('enderezar dentro y encima del túnel usa la superficie real sin reiniciar 
       map.world.step();
       const before = sim.body.translation(),
         time = police.elapsed;
-      assert(time > 1, 'la persecución ya tiene progreso');
       sim.recover(map.driveGroundHeight);
       const p = sim.body.translation();
       assert.equal(p.x, before.x);
       assert.equal(p.z, before.z);
       assert.equal(police.elapsed, time);
-      if (roof) assert(p.y > f.p.y + 5.5, 'se queda sobre el techo');
-      else assert(p.y < f.p.y + 1.2, 'permanece dentro del túnel');
+      assert(p.y - f.p.y > 0.3 && p.y - f.p.y < 1.2, 'se levanta sobre la carretera abierta');
       for (let i = 0; i < 60; i++) sim.step(neutral, 1 / 60);
       assert(sim.body.translation().y > f.p.y + 0.3);
     }

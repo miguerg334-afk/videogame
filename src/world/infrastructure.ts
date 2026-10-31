@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { RouteFrame, TunnelRange } from '../engine/types';
+import type { RouteFrame } from '../engine/types';
 
 type OffsetPoint = (frame: RouteFrame, distance: number, lift?: number) => THREE.Vector3;
 const metal = (color: number, roughness = 0.45) =>
@@ -263,40 +263,4 @@ export function detailGantry(gantry: THREE.Group) {
       brace.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.sub(a).normalize());
     }
   }
-}
-
-export function addTunnelRibs(
-  scene: THREE.Scene,
-  frames: RouteFrame[],
-  ranges: TunnelRange[],
-  offset: OffsetPoint,
-  length: number,
-) {
-  const points = [new THREE.Vector3(0, 0.12, -6.32), new THREE.Vector3(0, 2.9, -6.32)];
-  for (let j = 1; j < 25; j++) {
-    const a = (j * Math.PI) / 24;
-    points.push(new THREE.Vector3(0, 2.9 + 2.7 * Math.sin(a), -6.32 * Math.cos(a)));
-  }
-  points.push(new THREE.Vector3(0, 0.12, 6.32));
-  const geometry = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 64, 0.065, 5, false);
-  const indices: number[] = [];
-  for (const range of ranges)
-    for (
-      let i = range.start;
-      i <= range.end;
-      i += Math.max(1, Math.round((12 / length) * (frames.length - 1)))
-    )
-      indices.push(i);
-  const ribs = new THREE.InstancedMesh(geometry, metal(0x808d92, 0.7), indices.length);
-  const object = new THREE.Object3D();
-  indices.forEach((index, i) => {
-    const frame = frames[index];
-    object.position.copy(offset(frame, 0));
-    object.rotation.set(0, -Math.atan2(frame.tangent.z, frame.tangent.x), 0);
-    object.updateMatrix();
-    ribs.setMatrixAt(i, object.matrix);
-  });
-  ribs.name = 'tunnel-steel-ribs';
-  ribs.receiveShadow = true;
-  scene.add(ribs);
 }

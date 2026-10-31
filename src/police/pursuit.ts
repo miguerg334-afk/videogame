@@ -148,7 +148,7 @@ export function createPursuit(
     } else if (started && path.length) path[path.length - 1].copy(intercept);
     point.set(p.x, p.y, p.z);
     const speed = Math.hypot(velocity.x, velocity.z);
-    // Local projection preserves route order at intersections and on stacked tunnel roads.
+    // Local projection preserves route order at intersections and on stacked surfaces.
     let best = Infinity,
       bestHead = head;
     const end = Math.min(path.length - 1, head + 40);

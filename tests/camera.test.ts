@@ -2,55 +2,31 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as THREE from 'three';
 import R from '@dimforge/rapier3d-compat/rapier.es.js';
-import { createRouteLookup } from '../src/world/route';
-import { constrainChaseCamera, tunnelInteriorAt } from '../src/engine/camera';
+import { constrainChaseCamera } from '../src/engine/camera';
 import { createMountainWorld } from '../src/world/mountain.js';
-import type { RouteFrame } from '../src/engine/types';
 import { disposeScene } from '../src/engine/dispose';
 await R.init();
-const frames: RouteFrame[] = Array.from({ length: 101 }, (_, i) => ({
-  p: new THREE.Vector3(i, 0, 0),
-  tangent: new THREE.Vector3(1, 0, 0),
-  normal: new THREE.Vector3(0, 0, 1),
-  grade: 0,
-  t: i / 100,
-}));
-const tunnel = { name: 'Galería', start: 20, end: 80, from: 20, to: 80, north: true };
-const route = {
-  frames,
-  nearestTrack: createRouteLookup(frames),
-  tunnelForIndex: (index: number) => (index >= 20 && index <= 80 ? tunnel : undefined),
-  routeHeight: () => 0,
-  driveGroundHeight: () => 0,
-};
-test('no atrae la cámara al túnel desde los lados, el techo o antes de la boca', () => {
-  for (const z of [-12, -7.4, 7.4, 12]) {
-    const vehicle = new THREE.Vector3(45, 0.7, z),
-      camera = new THREE.Vector3(38, 4, z);
-    assert(!tunnelInteriorAt(vehicle, route));
-    constrainChaseCamera(camera, route, vehicle);
-    assert.equal(camera.z, z);
-    assert.equal(camera.y, 4);
+test('la cámara conserva su encuadre y respeta suelo y obstáculos físicos', () => {
+  const route = { driveGroundHeight: () => 7 };
+  const point = new THREE.Vector3(12, 2, 9);
+  constrainChaseCamera(point, route, new THREE.Vector3(0, 7.7, 0));
+  assert.equal(point.x, 12);
+  assert.equal(point.z, 9);
+  assert.equal(point.y, 8.3);
+  const world = new R.World({ x: 0, y: -9.81, z: 0 });
+  world.createCollider(R.ColliderDesc.cuboid(0.1, 4, 10).setTranslation(5, 4, 0));
+  world.step();
+  try {
+    const camera = new THREE.Vector3(10, 3, 0);
+    constrainChaseCamera(
+      camera,
+      { world, driveGroundHeight: () => 0 },
+      new THREE.Vector3(0, 0.7, 0),
+    );
+    assert(camera.x > 3 && camera.x < 4.5, 'se queda del lado del coche frente al muro');
+  } finally {
+    world.free();
   }
-  for (const x of [19.7, 80.3]) {
-    const vehicle = new THREE.Vector3(x, 0.7, 0),
-      camera = new THREE.Vector3(x, 9, 9);
-    assert(!tunnelInteriorAt(vehicle, route));
-    constrainChaseCamera(camera, route, vehicle);
-    assert.equal(camera.z, 9);
-    assert.equal(camera.y, 9);
-  }
-  const roof = new THREE.Vector3(45, 7, 0),
-    camera = new THREE.Vector3(38, 10, 9);
-  assert(!tunnelInteriorAt(roof, route));
-  constrainChaseCamera(camera, route, roof);
-  assert.equal(camera.z, 9);
-  assert.equal(camera.y, 10);
-  const inside = new THREE.Vector3(45, 0.7, 0),
-    wanted = new THREE.Vector3(38, 12, 9);
-  assert(tunnelInteriorAt(inside, route));
-  constrainChaseCamera(wanted, route, inside);
-  assert(wanted.z <= 4.7 && wanted.y < 5.3);
 });
 const context = new Proxy(
   {
@@ -62,58 +38,45 @@ const context = new Proxy(
 const canvasDocument = {
   createElement: () => ({ width: 0, height: 0, getContext: () => context }),
 } as unknown as Document;
-test('ambos túneles reales: cámara exterior, paredes exteriores, techo y transición a interior', () => {
+test('la carretera liberada mantiene cielo y laterales abiertos, sin restricciones de cámara antiguas', () => {
   const scene = new THREE.Scene(),
     map = createMountainWorld(scene, new THREE.Group(), canvasDocument);
   try {
     map.world.step();
-    for (const tunnel of map.tunnelRanges) {
-      const frame = map.frames[Math.round((tunnel.start + tunnel.end) / 2)];
-      const at = (lateral: number, height: number) =>
-        frame.p
-          .clone()
-          .addScaledVector(frame.normal, lateral)
-          .add(new THREE.Vector3(0, height, 0));
-      const lateral = (p: THREE.Vector3) =>
-        (p.x - frame.p.x) * frame.normal.x + (p.z - frame.p.z) * frame.normal.z;
-      for (const side of [-1, 1]) {
-        const outside = at(side * 9, 0.7),
-          clear = at(side * 12, 3.5);
-        constrainChaseCamera(clear, map, outside);
-        assert(
-          Math.abs(lateral(clear) - side * 12) < 0.01,
-          'el exterior mantiene su posición lateral',
-        );
-        for (const target of [side * 5, side * 6.9]) {
-          const blocked = at(target, 2.3);
-          constrainChaseCamera(blocked, map, outside);
-          assert(
-            side * lateral(blocked) > 7.3,
-            'se queda del lado exterior de la cubierta visible',
-          );
-          const origin = outside.clone().add(new THREE.Vector3(0, 0.8, 0)),
-            delta = blocked.clone().sub(origin);
-          assert(
-            !map.world.castRay(
-              new R.Ray(origin, delta.clone().normalize()),
-              delta.length(),
-              true,
-              R.QueryFilterFlags.EXCLUDE_DYNAMIC,
-            ),
-            'queda línea de visión libre hasta la cámara',
-          );
-        }
-      }
-      const roof = at(0, 7),
-        down = at(0, 4);
-      constrainChaseCamera(down, map, roof);
-      assert(down.y - frame.p.y > 6.4, 'no atraviesa el techo desde arriba');
-      const inside = at(0, 0.7),
-        camera = at(9, 25);
-      constrainChaseCamera(camera, map, inside);
+    scene.traverse((object) =>
+      assert(!/tunnel/i.test(object.name), 'no quedan mallas ni lámparas de túneles'),
+    );
+    for (const north of [true, false]) {
+      const frame = map.frames
+        .filter((f) => (north ? f.p.z > 155 : f.p.z < -305))
+        .reduce((a, b) => (Math.abs(a.p.x + 30) < Math.abs(b.p.x + 30) ? a : b));
+      const origin = frame.p.clone().add(new THREE.Vector3(0, 1.3, 0));
       assert(
-        Math.abs(lateral(camera)) < 4.8 && camera.y - map.routeHeight(camera.x, camera.z) < 5.3,
+        !map.world.castRay(
+          new R.Ray(origin, { x: 0, y: 1, z: 0 }),
+          15,
+          true,
+          R.QueryFilterFlags.EXCLUDE_DYNAMIC,
+        ),
+        'no queda techo invisible',
       );
+      const side = origin.clone().addScaledVector(frame.normal, -10);
+      assert(
+        !map.world.castRay(
+          new R.Ray(side, frame.normal),
+          20,
+          true,
+          R.QueryFilterFlags.EXCLUDE_DYNAMIC,
+        ),
+        'no quedan paredes invisibles',
+      );
+      const desired = frame.p
+        .clone()
+        .addScaledVector(frame.normal, 10)
+        .add(new THREE.Vector3(0, 20, 0));
+      const camera = desired.clone();
+      constrainChaseCamera(camera, map, frame.p.clone().add(new THREE.Vector3(0, 0.7, 0)));
+      assert(camera.distanceTo(desired) < 0.01, 'el encuadre no se comprime en la antigua galería');
     }
   } finally {
     map.world.free();

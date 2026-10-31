@@ -79,8 +79,8 @@ export function addForestLOD(
       cell.z,
     );
     lod.addLevel(new THREE.Group(), 0);
-    lod.addLevel(new THREE.Group(), 220);
-    lod.addLevel(new THREE.Group(), 1100);
+    lod.addLevel(new THREE.Group(), 190);
+    lod.addLevel(new THREE.Group(), 850);
     lods.set(key, lod);
     scene.add(lod);
   }
@@ -175,4 +175,80 @@ export function addForestLOD(
     });
   }
   return { cells: lods.size, detailedTriangles };
+}
+
+/** Far terrain uses a coarser grid, keeping every border vertex to prevent LOD cracks. */
+export function addTerrainLOD(scene: THREE.Scene, tiles: THREE.Mesh[], nearDistance = 500) {
+  let nearTriangles = 0,
+    farTriangles = 0;
+  for (const tile of tiles) {
+    const source = tile.geometry as THREE.BufferGeometry;
+    const positions = source.getAttribute('position');
+    const xs = [
+      ...new Set(Array.from({ length: positions.count }, (_, i) => positions.getX(i))),
+    ].sort((a, b) => a - b);
+    const zs = [
+      ...new Set(Array.from({ length: positions.count }, (_, i) => positions.getZ(i))),
+    ].sort((a, b) => a - b);
+    const vertices = new Map<string, number>();
+    for (let i = 0; i < positions.count; i++)
+      vertices.set(`${positions.getX(i)},${positions.getZ(i)}`, i);
+    const at = (x: number, z: number) => vertices.get(`${xs[x]},${zs[z]}`)!;
+    const indices: number[] = [];
+    for (let x = 0; x < xs.length - 1; x += 2)
+      for (let z = 0; z < zs.length - 1; z += 2) {
+        const bx = Math.min(x + 2, xs.length - 1),
+          bz = Math.min(z + 2, zs.length - 1);
+        if (bx - x < 2 || bz - z < 2) {
+          for (let ix = x; ix < bx; ix++)
+            for (let iz = z; iz < bz; iz++) {
+              const a = at(ix, iz),
+                b = at(ix + 1, iz),
+                c = at(ix, iz + 1),
+                d = at(ix + 1, iz + 1);
+              indices.push(a, c, b, c, d, b);
+            }
+          continue;
+        }
+        const ring = [at(x, z)];
+        if (x === 0) ring.push(at(x, z + 1));
+        ring.push(at(x, bz));
+        if (bz === zs.length - 1) ring.push(at(x + 1, bz));
+        ring.push(at(bx, bz));
+        if (bx === xs.length - 1) ring.push(at(bx, z + 1));
+        ring.push(at(bx, z));
+        if (z === 0) ring.push(at(x + 1, z));
+        if (ring.length === 4) indices.push(ring[0], ring[1], ring[3], ring[1], ring[2], ring[3]);
+        else {
+          const center = at(x + 1, z + 1);
+          for (let i = 0; i < ring.length; i++)
+            indices.push(center, ring[i], ring[(i + 1) % ring.length]);
+        }
+      }
+    const coarse = new THREE.BufferGeometry();
+    for (const [name, attribute] of Object.entries(source.attributes))
+      coarse.setAttribute(name, attribute);
+    coarse.setIndex(indices);
+    coarse.computeBoundingSphere();
+    const low = new THREE.Mesh(coarse, tile.material);
+    low.name = 'terrain-distant-tile';
+    low.receiveShadow = tile.receiveShadow;
+    source.computeBoundingSphere();
+    const center = source.boundingSphere!.center;
+    const lod = new THREE.LOD();
+    lod.name = 'terrain-lod';
+    lod.position.copy(center);
+    for (const mesh of [tile, low]) {
+      mesh.position.copy(center).negate();
+      mesh.updateMatrix();
+      mesh.matrixAutoUpdate = false;
+    }
+    scene.remove(tile);
+    lod.addLevel(tile, 0);
+    lod.addLevel(low, nearDistance);
+    scene.add(lod);
+    nearTriangles += source.index!.count / 3;
+    farTriangles += indices.length / 3;
+  }
+  return { nearTriangles, farTriangles };
 }

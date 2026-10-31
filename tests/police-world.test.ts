@@ -17,7 +17,7 @@ const ctx = new Proxy(
 const doc = {
   createElement: () => ({ width: 0, height: 0, getContext: () => ctx }),
 } as unknown as Document;
-test('la persecución al objetivo actual atraviesa ambos túneles con física real', () => {
+test('la persecución al objetivo actual atraviesa los tramos abiertos del norte y sur con física real', () => {
   const scene = new THREE.Scene(),
     map = createMountainWorld(scene, new THREE.Group(), doc);
   const police = createPursuit(map.world, map.driveGroundHeight, createPursuitNavigation(map));
@@ -25,15 +25,28 @@ test('la persecución al objetivo actual atraviesa ambos túneles con física re
     spacing = map.trackLength / map.N;
   map.world.timestep = dt;
   try {
-    for (const tunnel of map.tunnelRanges) {
-      const start = tunnel.start - 30;
+    for (const north of [true, false]) {
+      const indices = map.frames
+        .map((f, i) => ({ f, i }))
+        .filter(({ f }) =>
+          north
+            ? f.p.x > -120 && f.p.x < 70 && f.p.z > 155
+            : f.p.x > -90 && f.p.x < 240 && f.p.z < -305,
+        )
+        .map(({ i }) => i);
+      const section = {
+        start: Math.min(...indices),
+        end: Math.max(...indices),
+        name: north ? 'Norte' : 'Sur',
+      };
+      const start = section.start - 30;
       const seed = map.frames
         .slice(start, start + 40)
         .map((f) => ({ x: f.p.x, y: f.p.y + 0.7, z: f.p.z }));
       police.reset(seed);
       let passed = false,
         minimumClearance = Infinity,
-        tunnelDeviation = 0;
+        routeDeviation = 0;
       for (let tick = 0; tick < 120 * 22; tick++) {
         const frame = map.frames[(start + Math.floor((60 + tick * dt * 27) / spacing)) % map.N];
         const p = police.body.translation(),
@@ -47,23 +60,24 @@ test('la persecución al objetivo actual atraviesa ambos túneles con física re
         );
         map.world.step();
         police.afterStep();
-        if (near.index >= tunnel.start && near.index <= tunnel.end) {
-          tunnelDeviation = Math.max(tunnelDeviation, near.distance);
+        if (near.index >= section.start && near.index <= section.end) {
+          routeDeviation = Math.max(routeDeviation, near.distance);
           minimumClearance = Math.min(minimumClearance, p.y - map.routeHeight(p.x, p.z));
         }
-        if (near.index > tunnel.end && near.index < tunnel.end + 300) passed = true;
+        if (near.index > section.end && near.index < section.end + 300) passed = true;
       }
       console.log({
-        tunnel: tunnel.name,
+        section: section.name,
         passed,
         minimumClearance,
-        tunnelDeviation,
+        routeDeviation,
         position: police.body.translation(),
       });
-      assert(passed, 'no se queda bloqueado en la entrada o dentro del túnel');
-      assert(minimumClearance > 0.25 && minimumClearance < 1, 'circula por el interior físico');
-      // Tunnel half-width is 6.5 m; reserve at least 0.9 m for the chassis.
-      assert(tunnelDeviation < 5.6, 'el chasis permanece dentro de las paredes de la galería');
+      assert(passed, 'continúa por la carretera abierta sin quedarse bloqueado');
+      assert(
+        minimumClearance > 0.25 && minimumClearance < 1,
+        'mantiene contacto con la superficie física',
+      );
     }
   } finally {
     police.dispose();

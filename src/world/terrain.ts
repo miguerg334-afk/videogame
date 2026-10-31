@@ -3,7 +3,7 @@ import R from '@dimforge/rapier3d-compat/rapier.es.js';
 import { routeHeight, smoothStep } from './route';
 import type { createRouteLookup } from './route';
 import type { TrailNetwork } from './trails';
-import { tileSurface } from './visibility';
+import { tileSurface, addTerrainLOD } from './visibility';
 
 function hash(x: number, z: number) {
   const value = Math.sin(x * 127.1 + z * 311.7) * 43758.5453123;
@@ -26,7 +26,7 @@ export function createTerrainHeight(
 ) {
   return (x: number, z: number) => {
     const near = nearestTrack({ x, z });
-    // A depressed, continuous road bed remains underneath every road and tunnel.
+    // A depressed, continuous road bed remains underneath the entire road.
     const road = routeHeight(x, z) - 0.12;
     // Domain-warped ridges break up the old smooth bowl-shaped hills.
     const wx = x + noise(x / 510 + 3, z / 510) * 115;
@@ -167,6 +167,7 @@ export function createTerrain(
   mesh.receiveShadow = true;
   scene.add(mesh);
   const tiles = tileSurface(scene, mesh);
+  const lod = addTerrainLOD(scene, tiles);
   world.createCollider(
     R.ColliderDesc.trimesh(
       new Float32Array(positions),
@@ -174,5 +175,5 @@ export function createTerrain(
       R.TriMeshFlags.FIX_INTERNAL_EDGES,
     ).setFriction(0.6),
   );
-  return { mesh, columns, rows, tiles };
+  return { mesh, columns, rows, tiles, lod };
 }

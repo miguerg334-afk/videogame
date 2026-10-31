@@ -21,7 +21,7 @@ test('la presión empieza baja, aumenta gradualmente y se limita a cinco intensi
   assert.equal(pursuitDifficulty(30).level, 2);
   assert.equal(pursuitDifficulty(60).level, 3);
   assert.equal(pursuitDifficulty(120).level, 5);
-  assert(Math.abs(pursuitDifficulty(600).maxSpeed * 3.6 - 126) < 1e-8);
+  assert(Math.abs(pursuitDifficulty(600).maxSpeed * 3.6 - 135) < 1e-8);
   assert.equal(pursuitDifficulty(-1).level, 1);
 });
 
@@ -102,7 +102,7 @@ test('detecta contacto real, sin confundir proximidad ni separación vertical', 
     sim.reset({ x: -55, y: 7, z: 0 }, 0);
     sim.step(neutral, dt);
     police.afterStep();
-    assert(!police.touches(sim.body), 'no captura a través del techo de un túnel');
+    assert(!police.touches(sim.body), 'no confunde separación vertical con contacto');
     sim.reset({ x: -55, y: 0.65, z: 3 }, 0);
     sim.step(neutral, dt);
     police.afterStep();
@@ -118,7 +118,7 @@ test('detecta contacto real, sin confundir proximidad ni separación vertical', 
   }
 });
 
-test('la patrulla tiene una ventaja física limitada a seis km/h y el jugador conserva su máximo', () => {
+test('la patrulla alcanza 135 km/h y el jugador conserva su máximo de 120', () => {
   const world = new R.World({ x: 0, y: -9.81, z: 0 });
   world.createCollider(R.ColliderDesc.cuboid(15000, 0.1, 50).setTranslation(7000, -0.1, 0));
   const police = createPursuit(world),
@@ -142,13 +142,15 @@ test('la patrulla tiene una ventaja física limitada a seis km/h y el jugador co
         playerSpeed = Math.hypot(v.x, v.z) * 3.6;
       playerMaximum = Math.max(playerMaximum, playerSpeed);
       policeMaximum = Math.max(policeMaximum, police.speed * 3.6);
-      assert(Math.abs(police.difficulty.maxSpeed * 3.6 - sim.speedLimitKmh - 6) < 1e-8);
+      assert(
+        Math.abs(police.difficulty.maxSpeed * 3.6 - policeSpeedLimitKmh(police.elapsed)) < 1e-8,
+      );
       assert(playerSpeed <= 120.0001);
       assert(police.speed * 3.6 <= policeSpeedLimitKmh(police.elapsed) + 0.001);
       if (tick === 120 * 120)
         gapAtTwoMinutes = sim.body.translation().x - police.body.translation().x;
     }
-    assert(playerMaximum > 119.9 && policeMaximum > 125.9);
+    assert(playerMaximum > 119.9 && policeMaximum > 134.9);
     assert(
       sim.body.translation().x - police.body.translation().x < gapAtTwoMinutes - 70,
       'la velocidad extra permite recuperar distancia',
@@ -165,7 +167,7 @@ test('la patrulla tiene una ventaja física limitada a seis km/h y el jugador co
   }
 });
 
-test('progresión de 100 a 120 para el jugador y seis km/h extra para la patrulla', () => {
+test('progresión de 100 a 120 para el jugador y de 106 a 135 para la patrulla', () => {
   for (const [time, speed] of [
     [0, 100],
     [30, 105],
@@ -176,7 +178,12 @@ test('progresión de 100 a 120 para el jugador y seis km/h extra para la patrull
     [-1, 100],
   ]) {
     assert.equal(pursuitSpeedLimitKmh(time), speed);
-    assert(Math.abs(pursuitDifficulty(time).maxSpeed * 3.6 - speed - 6) < 1e-8);
+    assert(
+      Math.abs(
+        pursuitDifficulty(time).maxSpeed * 3.6 -
+          (speed + 6 + 9 * Math.max(0, Math.min(1, time / 120))),
+      ) < 1e-8,
+    );
   }
 });
 
@@ -206,7 +213,7 @@ test('ambos coches mantienen tracción física y límites respectivos en pendien
       }
       const v = sim.body.linvel();
       assert(Math.hypot(v.x, v.z) * 3.6 > 119.9);
-      assert(police.speed * 3.6 > 125.8 && police.speed * 3.6 < 126.01);
+      assert(police.speed * 3.6 > 134.8 && police.speed * 3.6 < 135.01);
       const p = police.body.translation();
       assert(p.y - grade * p.x > 0.3, 'la patrulla permanece apoyada en la pendiente');
     } finally {

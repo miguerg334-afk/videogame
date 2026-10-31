@@ -27,7 +27,7 @@ export function createAdaptiveQuality(maxRatio: number) {
       warmup = 0.5;
     },
     sample(dt: number) {
-      if (dt <= 0 || dt > 0.25) return false;
+      if (dt <= 0 || dt > 1) return false;
       if (warmup > 0) {
         warmup -= dt;
         return false;

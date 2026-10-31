@@ -17,7 +17,7 @@ const canvasDocument = {
   createElement: () => ({ width: 0, height: 0, getContext: () => context }),
 } as unknown as Document;
 const neutral = { up: false, down: false, left: false, right: false, handbrake: false };
-test('personaje en el mapa real: ascensión, túnel, atajo y límite exterior', () => {
+test('personaje en el mapa real: ascensión, carretera, atajo y límite exterior', () => {
   const scene = new THREE.Scene(),
     map = createMountainWorld(scene, new THREE.Group(), canvasDocument),
     sim = createCharacterPhysics(map.world);
@@ -31,15 +31,14 @@ test('personaje en el mapa real: ascensión, túnel, atajo y límite exterior', 
     let p = sim.body.translation();
     assert(p.x > ascent.p.x + 35 && p.y > ascent.p.y + 8, 'sube la pendiente de montaña');
     assert(p.y > map.driveGroundHeight(p.x, p.z) - 0.2, 'permanece encima del terreno');
-    const tunnel = map.tunnelRanges[0],
-      entry = map.frames[tunnel.start - 15];
+    const entry = map.frames.find((f) => f.p.x > -145 && f.p.x < -142 && f.p.z > 155)!;
     sim.reset(
       { x: entry.p.x, y: entry.p.y + 0.12, z: entry.p.z },
       -Math.atan2(entry.tangent.z, entry.tangent.x),
     );
     for (let i = 0; i < 1200; i++) sim.step({ ...neutral, up: true, boost: true }, 1 / 120);
     p = sim.body.translation();
-    assert(p.x > map.frames[tunnel.end].p.x, 'cruza el túnel corriendo');
+    assert(p.x > 70, 'cruza el tramo abierto corriendo');
     const trail = map.trailNetwork.trails[2].frames[18];
     sim.reset(
       { x: trail.p.x, y: trail.p.y + 0.12, z: trail.p.z },

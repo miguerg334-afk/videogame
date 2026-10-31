@@ -7,17 +7,17 @@ import { createTrailNetwork, buildMountainTrails } from './trails';
 import { createForest } from './forest';
 import { createWorldBoundary } from './boundary';
 import { createRoadMaterials } from './road-materials';
-import { createIBeamGeometry, addRoadDetails, detailGantry, addTunnelRibs } from './infrastructure';
+import { createIBeamGeometry, addRoadDetails, detailGantry } from './infrastructure';
 
 /**
- * Build terrain, road colliders, tunnels and night lighting.
+ * Build terrain, road colliders and night lighting.
  * @param {THREE.Scene} scene
  * @param {THREE.Group} car
  * @param {Document} document
  */
 export function createMountainWorld(scene, car, document) {
   const vec = (x, y, z) => new THREE.Vector3(x, y, z);
-  // Ruta de montaña ampliada: rectas, pendientes continuas y túneles transitables.
+  // Ruta de montaña ampliada: rectas y pendientes continuas a cielo abierto.
   const world = new R.World({ x: 0, y: -9.81, z: 0 });
   world.numSolverIterations = 8;
 
@@ -71,26 +71,6 @@ export function createMountainWorld(scene, car, document) {
     frames.push({ p, tangent, normal, t, grade });
   }
   const nearestTrack = createRouteLookup(frames);
-  /** @type {import('../engine/types').TunnelRange[]} */
-  const tunnelRanges = [];
-  for (const spec of [
-    { name: 'Túnel del Pinar', from: -120, to: 70, north: true },
-    { name: 'Túnel de la Cumbre', from: -90, to: 240, north: false },
-  ]) {
-    const indices = frames
-      .map((f, i) => ({ f, i }))
-      .filter(
-        ({ f }) =>
-          f.p.x > spec.from && f.p.x < spec.to && (spec.north ? f.p.z > 155 : f.p.z < -305),
-      )
-      .map(({ i }) => i);
-    tunnelRanges.push({ ...spec, start: Math.min(...indices), end: Math.max(...indices) });
-  }
-  /** @param {number} index
-   * @param {number} margin */
-  function tunnelForIndex(index, margin = 0) {
-    return tunnelRanges.find((t) => index >= t.start - margin && index <= t.end + margin);
-  }
   const trailNetwork = createTrailNetwork(nearestTrack);
   const terrainHeight = createTerrainHeight(nearestTrack, trailNetwork);
   /** @param {number} x
@@ -253,160 +233,6 @@ export function createMountainWorld(scene, car, document) {
     }
     scene.add(g);
   }
-  // Galerías arqueadas con techo y paredes que también participan en las colisiones.
-  const tunnelConcrete = material(0x747b7b, 0.96);
-  tunnelConcrete.side = THREE.DoubleSide;
-  const tunnelRock = material(0x5c625e);
-  tunnelRock.side = THREE.DoubleSide;
-  const tunnelGlow = new THREE.MeshStandardMaterial({
-    color: 0xffd79e,
-    emissive: 0xffb762,
-    emissiveIntensity: 2.2,
-    roughness: 0.6,
-  });
-  const tunnelLampPoints = [];
-  function tunnelSurface(range, outer = false) {
-    const vertices = [],
-      indices = [],
-      cross = [];
-    cross.push([-6.5, 0]);
-    for (let j = 0; j <= 24; j++) {
-      const angle = (j * Math.PI) / 24;
-      cross.push([-6.5 * Math.cos(angle), 3 + 2.8 * Math.sin(angle)]);
-    }
-    cross.push([6.5, 0]);
-    const count = cross.length;
-    for (let i = range.start; i <= range.end; i++) {
-      const frame = frames[i];
-      for (const [d, h] of cross) {
-        const p = offsetPoint(frame, d * (outer ? 1.1 : 1));
-        vertices.push(p.x, p.y + h + (outer ? 0.55 : 0), p.z);
-      }
-      if (i < range.end) {
-        const k = (i - range.start) * count;
-        for (let j = 0; j < count - 1; j++) {
-          const a = k + j,
-            b = a + count;
-          indices.push(a, b, a + 1, a + 1, b, b + 1);
-        }
-      }
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-    geometry.setIndex(indices);
-    geometry.computeVertexNormals();
-    const shell = new THREE.Mesh(geometry, outer ? tunnelRock : tunnelConcrete);
-    shell.castShadow = true;
-    shell.receiveShadow = true;
-    scene.add(shell);
-    // Both visible shells are solid: outside driving and camera rays must meet
-    // the same surface that is rendered, including the rock cover and roof.
-    world.createCollider(
-      R.ColliderDesc.trimesh(
-        new Float32Array(vertices),
-        new Uint32Array(indices),
-        R.TriMeshFlags.FIX_INTERNAL_EDGES,
-      ).setFriction(0.5),
-    );
-    return cross;
-  }
-  const portalLampMaterial = new THREE.MeshStandardMaterial({
-    color: 0x85e4cf,
-    emissive: 0x45c8af,
-    emissiveIntensity: 1.6,
-  });
-  for (const range of tunnelRanges) {
-    const cross = tunnelSurface(range);
-    tunnelSurface(range, true);
-    for (const index of [range.start, range.end]) {
-      const frame = frames[index],
-        points = cross.map(([d, h]) => {
-          const p = offsetPoint(frame, d * 1.025);
-          p.y += h + 0.08;
-          return p;
-        });
-      const portal = new THREE.Mesh(
-        new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 72, 0.29, 6, false),
-        tunnelRock,
-      );
-      portal.castShadow = true;
-      scene.add(portal);
-      for (const sign of [-1, 1]) {
-        const p = offsetPoint(frame, sign * 6.55);
-        const band = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.25, 0.16), portalLampMaterial);
-        band.position.copy(p);
-        band.position.y += 1.2;
-        scene.add(band);
-      }
-      // El nombre del túnel aparece sobre el portal, fuera de la calzada.
-      const labelCanvas = document.createElement('canvas');
-      labelCanvas.width = 1024;
-      labelCanvas.height = 128;
-      const lc = labelCanvas.getContext('2d');
-      lc.fillStyle = '#17242a';
-      lc.fillRect(0, 0, 1024, 128);
-      lc.fillStyle = '#cbe9e3';
-      lc.font = 'bold 47px Arial';
-      lc.textAlign = 'center';
-      lc.fillText(range.name.toUpperCase(), 512, 82);
-      const tex = new THREE.CanvasTexture(labelCanvas);
-      tex.encoding = THREE.sRGBEncoding;
-      const plate = new THREE.Mesh(
-        new THREE.PlaneGeometry(7, 0.85),
-        new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }),
-      );
-      plate.position.copy(frame.p);
-      plate.position.y += 6.25;
-      plate.rotation.y =
-        -Math.atan2(frame.tangent.z, frame.tangent.x) +
-        (index === range.start ? -Math.PI / 2 : Math.PI / 2);
-      scene.add(plate);
-    }
-    let lastDistance = -100;
-    for (let i = range.start; i <= range.end; i++) {
-      const distance = ((i - range.start) / N) * trackLength;
-      if (distance - lastDistance < 14) continue;
-      lastDistance = distance;
-      const frame = frames[i],
-        p = offsetPoint(frame, 0);
-      p.y += 5.27;
-      tunnelLampPoints.push(p);
-      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.07, 2), tunnelGlow);
-      lamp.position.copy(p);
-      lamp.rotation.y = -Math.atan2(frame.tangent.z, frame.tangent.x);
-      scene.add(lamp);
-      for (const side of [-1, 1]) {
-        const sideLamp = new THREE.Mesh(
-          new THREE.BoxGeometry(0.24, 0.11, 0.08),
-          portalLampMaterial,
-        );
-        sideLamp.position.copy(offsetPoint(frame, side * 6.4));
-        sideLamp.position.y += 0.68;
-        sideLamp.rotation.y = -Math.atan2(frame.tangent.z, frame.tangent.x);
-        scene.add(sideLamp);
-      }
-    }
-  }
-  addTunnelRibs(scene, frames, tunnelRanges, offsetPoint, trackLength);
-  // Se reutilizan cuatro luces próximas al vehículo para controlar el coste de renderizado.
-  const tunnelLightPool = Array.from({ length: 4 }, () => {
-    const light = new THREE.PointLight(0xffcb8b, 0, 24, 2);
-    scene.add(light);
-    return light;
-  });
-  /** @param {THREE.Vector3} position */
-  function updateTunnelLights(position) {
-    const sorted = tunnelLampPoints
-      .map((p) => ({ p, d: p.distanceToSquared(position) }))
-      .sort((a, b) => a.d - b.d);
-    for (let i = 0; i < 4; i++) {
-      const light = tunnelLightPool[i],
-        entry = sorted[i];
-      light.intensity = entry && entry.d < 36 * 36 ? 38 : 0;
-      if (entry) light.position.copy(entry.p);
-    }
-  }
-
   const rig = new THREE.Group();
   scene.remove(car);
   rig.add(car);
@@ -492,25 +318,15 @@ export function createMountainWorld(scene, car, document) {
       }),
     ),
   );
-  // Faros físicos: dos conos de luz unidos al chasis apuntan sobre el asfalto.
-  const headlamps = [],
-    lampTargets = [];
-  for (const sign of [-1, 1]) {
-    const lamp = new THREE.SpotLight(0xdcecff, 1400, 85, 0.26, 0.58, 2);
-    lamp.position.set(2.35, 0.13, sign * 0.61);
-    const target = new THREE.Object3D();
-    target.position.set(38, -1.3, sign * 2.6);
-    rig.add(lamp, target);
-    lamp.target = target;
-    lamp.castShadow = sign < 0;
-    lamp.shadow.mapSize.set(512, 512);
-    lamp.shadow.camera.near = 0.15;
-    lamp.shadow.camera.far = 85;
-    lamp.shadow.bias = -0.00035;
-    lamp.shadow.normalBias = 0.015;
-    headlamps.push(lamp);
-    lampTargets.push(target);
-  }
+  // One broad beam illuminates the road; both visible headlight meshes remain on the car.
+  const headlamps = [];
+  const lamp = new THREE.SpotLight(0xdcecff, 2400, 85, 0.3, 0.62, 2);
+  lamp.position.set(2.35, 0.13, 0);
+  const target = new THREE.Object3D();
+  target.position.set(38, -1.3, 0);
+  rig.add(lamp, target);
+  lamp.target = target;
+  headlamps.push(lamp);
   const tailGlow = new THREE.PointLight(0xff2510, 0.85, 4.2, 2);
   tailGlow.position.set(-2.32, 0.03, 0);
   rig.add(tailGlow);
@@ -528,11 +344,8 @@ export function createMountainWorld(scene, car, document) {
     headlamps,
     tailGlow,
     sunOffset,
-    updateTunnelLights,
-    tunnelForIndex,
     routeHeight,
     driveGroundHeight,
-    tunnelRanges,
     terrain,
     terrainHeight,
     trailNetwork,

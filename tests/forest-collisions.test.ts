@@ -29,7 +29,7 @@ test('conserva todos los árboles y activa sus choques antes de que el coche pue
     );
   }
   try {
-    assert.equal(forest.count, 1800);
+    assert.equal(forest.count, 800);
     forest.updateColliders(first);
     map.world.step();
     assert(forest.activeColliderCount > 0 && forest.activeColliderCount < 300);
@@ -54,7 +54,7 @@ test('conserva todos los árboles y activa sus choques antes de que el coche pue
     forest.updateColliders(far);
     map.world.step();
     assert(!trunk(first) && trunk(far), 'descarga la región que ya no necesita ningún coche');
-    assert.equal(forest.positions.length, 1800, 'no se elimina vegetación visual');
+    assert.equal(forest.positions.length, 800, 'no se elimina vegetación visual');
   } finally {
     map.world.free();
     disposeScene(scene);
