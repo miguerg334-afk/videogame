@@ -88,34 +88,40 @@ test('los seis accesos no invaden el asfalto ni crean escalones o choques en la 
           }
         }
         // Drive past each junction in both directions with the real car body.
-        for (const direction of [1, -1]) {
-          const start = map.frames[(nearest.index - direction * 9 + map.N) % map.N];
-          sim.reset(
-            { x: start.p.x, y: start.p.y + 0.7, z: start.p.z },
-            -Math.atan2(start.tangent.z * direction, start.tangent.x * direction),
-            start.grade * direction,
-          );
-          for (let tick = 0; tick < 60; tick++) sim.step({ ...neutral, handbrake: true }, 1 / 120);
-          const initial = vector(sim.body.translation());
-          sim.body.setLinvel(
-            {
-              x: start.tangent.x * direction * 30,
-              y: start.grade * direction * 30,
-              z: start.tangent.z * direction * 30,
-            },
-            true,
-          );
-          for (let tick = 0; tick < 120; tick++) sim.step(neutral, 1 / 120);
-          const end = vector(sim.body.translation()),
-            rotation = sim.body.rotation(),
-            q = new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
-          const progress = end.clone().sub(initial).dot(start.tangent) * direction;
-          assert(progress > 22, `${trail.name}: el coche se atasca en el cruce (${progress} m)`);
-          assert(
-            new THREE.Vector3(0, 1, 0).applyQuaternion(q).y > 0.85,
-            'el coche no vuelca en el acceso',
-          );
-          assert(end.y - routeHeight(end.x, end.z) < 1.5, 'no salta por un escalón invisible');
+        for (const initialSpeed of [80 / 3.6, 100 / 3.6]) {
+          for (const direction of [1, -1]) {
+            const start = map.frames[(nearest.index - direction * 9 + map.N) % map.N];
+            sim.reset(
+              { x: start.p.x, y: start.p.y + 0.7, z: start.p.z },
+              -Math.atan2(start.tangent.z * direction, start.tangent.x * direction),
+              start.grade * direction,
+            );
+            for (let tick = 0; tick < 60; tick++)
+              sim.step({ ...neutral, handbrake: true }, 1 / 120);
+            const initial = vector(sim.body.translation());
+            sim.body.setLinvel(
+              {
+                x: start.tangent.x * direction * initialSpeed,
+                y: start.grade * direction * initialSpeed,
+                z: start.tangent.z * direction * initialSpeed,
+              },
+              true,
+            );
+            for (let tick = 0; tick < 120; tick++) sim.step(neutral, 1 / 120);
+            const end = vector(sim.body.translation()),
+              rotation = sim.body.rotation(),
+              q = new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
+            const progress = end.clone().sub(initial).dot(start.tangent) * direction;
+            assert(
+              progress > initialSpeed * 0.72,
+              `${trail.name}: el coche se atasca en el cruce (${progress} m)`,
+            );
+            assert(
+              new THREE.Vector3(0, 1, 0).applyQuaternion(q).y > 0.85,
+              'el coche no vuelca en el acceso',
+            );
+            assert(end.y - routeHeight(end.x, end.z) < 1.5, 'no salta por un escalón invisible');
+          }
         }
       }
     }

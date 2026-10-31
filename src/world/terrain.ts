@@ -168,7 +168,11 @@ export function createTerrain(
   scene.add(mesh);
   const tiles = tileSurface(scene, mesh);
   world.createCollider(
-    R.ColliderDesc.trimesh(new Float32Array(positions), new Uint32Array(indices)).setFriction(0.6),
+    R.ColliderDesc.trimesh(
+      new Float32Array(positions),
+      new Uint32Array(indices),
+      R.TriMeshFlags.FIX_INTERNAL_EDGES,
+    ).setFriction(0.6),
   );
   return { mesh, columns, rows, tiles };
 }

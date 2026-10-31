@@ -76,7 +76,11 @@ export function createWorldBoundary(
   geometry.computeVertexNormals();
   // One static mesh lets Rapier's triangle BVH cull the distant perimeter cheaply.
   world.createCollider(
-    R.ColliderDesc.trimesh(new Float32Array(vertices), new Uint32Array(indices))
+    R.ColliderDesc.trimesh(
+      new Float32Array(vertices),
+      new Uint32Array(indices),
+      R.TriMeshFlags.FIX_INTERNAL_EDGES,
+    )
       .setFriction(0.6)
       .setRestitution(0.05),
   );

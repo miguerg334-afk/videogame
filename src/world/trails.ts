@@ -271,6 +271,10 @@ export function buildMountainTrails(
 
 function addTrailCollider(world: R.World, positions: number[], indices: number[]) {
   world.createCollider(
-    R.ColliderDesc.trimesh(new Float32Array(positions), new Uint32Array(indices)).setFriction(1.1),
+    R.ColliderDesc.trimesh(
+      new Float32Array(positions),
+      new Uint32Array(indices),
+      R.TriMeshFlags.FIX_INTERNAL_EDGES,
+    ).setFriction(1.1),
   );
 }

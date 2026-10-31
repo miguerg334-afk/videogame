@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { batchStaticParts } from './batching';
 
 /**
  * Procedural vehicle geometry, built once per session.
@@ -931,5 +932,9 @@ export function createVehicleModel(scene, renderer, document) {
     }
   });
 
-  return { car, paint, wheelAssemblies, whiteLED, redLED };
+  const batching = [batchStaticParts(car, new Set(wheelAssemblies.map((w) => w.pivot)))];
+  for (const { pivot, roll } of wheelAssemblies) {
+    batching.push(batchStaticParts(pivot, new Set([roll])), batchStaticParts(roll));
+  }
+  return { car, paint, wheelAssemblies, whiteLED, redLED, batching };
 }

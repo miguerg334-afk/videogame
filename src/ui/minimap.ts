@@ -8,7 +8,6 @@ export function createMinimap(
   mapCanvas: HTMLCanvasElement,
   frames: RouteFrame[],
   trails: MountainTrail[] = [],
-  pickups: { position: { x: number; z: number }; availableAt: number }[] = [],
 ) {
   const mapContext = context2D(mapCanvas);
   const N = frames.length - 1,
@@ -59,16 +58,18 @@ export function createMinimap(
   const startXY = mapPoint(start.p.x, start.p.z);
   mc.fillStyle = '#f1f0d3';
   mc.fillRect(startXY[0] - 3, startXY[1] - 4, 6, 8);
-  function drawMap(p: VectorLike, q: QuaternionLike, time = 0) {
+  function drawMap(p: VectorLike, q: QuaternionLike, police?: VectorLike, time = 0) {
     mapContext.clearRect(0, 0, 296, 224);
     mapContext.drawImage(mapBase, 0, 0);
-    mapContext.fillStyle = '#65dcff';
-    for (const pickup of pickups) {
-      if (time < pickup.availableAt) continue;
-      const [x, y] = mapPoint(pickup.position.x, pickup.position.z);
+    if (police) {
+      const [x, y] = mapPoint(police.x, police.z);
+      mapContext.fillStyle = Math.floor(time * 8) % 2 ? '#ff4b66' : '#4cafff';
       mapContext.beginPath();
-      mapContext.arc(x, y, 1.8, 0, Math.PI * 2);
+      mapContext.arc(x, y, 5, 0, Math.PI * 2);
       mapContext.fill();
+      mapContext.strokeStyle = '#fff';
+      mapContext.lineWidth = 1;
+      mapContext.stroke();
     }
     const f = rotateVector(q, { x: 1, y: 0, z: 0 }),
       [x, y] = mapPoint(p.x, p.z);

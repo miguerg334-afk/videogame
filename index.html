@@ -10,26 +10,76 @@
     />
     <title>APEX — Night Drive</title>
   </head>
-  <body>
+  <body class="is-menu">
     <div
       id="stage"
       tabindex="0"
-      aria-label="Circuito 3D. Usa las flechas para conducir, espacio para el freno de mano y R para volver a la pista."
+      aria-label="Circuito 3D. Usa las flechas para conducir, espacio para el freno de mano y R para reiniciar la persecución. Evita que la policía te toque. C o 1 a 4 cambian la cámara exterior; mantén B para mirar atrás."
     ></div>
+    <section id="startMenu" class="start-menu" aria-labelledby="menu-title">
+      <div class="menu-panel">
+        <div class="menu-brand">APEX <b>/</b> NIGHT DRIVE</div>
+        <span class="menu-kicker">SIERRA · PERSECUCIÓN NOCTURNA</span>
+        <h1 id="menu-title">NIGHT<br /><em>PURSUIT</em></h1>
+        <p class="menu-description">
+          La patrulla sigue tus huellas. Toma los atajos, cruza la montaña y aguanta todo lo que
+          puedas.
+        </p>
+        <div class="menu-rule">
+          <span class="police-dot"></span>Si el coche policial te toca, termina la partida.
+        </div>
+        <button id="play" class="play-button">Comenzar persecución <span>→</span></button>
+        <details class="menu-help">
+          <summary>Controles y reglas</summary>
+          <p>
+            <kbd>↑ ↓</kbd> Acelerar / frenar · <kbd>← →</kbd> Girar<br />
+            <kbd>Espacio</kbd> Freno de mano · <kbd>C</kbd> Cambiar cámara<br />
+            <kbd>1—4</kbd> Elegir cámara · Mantén <kbd>B</kbd> para mirar atrás<br />
+            <kbd>P</kbd> Pausa · <kbd>R</kbd> Reiniciar · <kbd>L</kbd> Luces
+          </p>
+          <p>
+            Tu máximo y el de la patrulla suben juntos de 100 a 120 km/h. La intensidad policial
+            sube cada 30 segundos. El minimapa, la distancia y la dirección indican dónde está la
+            patrulla.
+          </p>
+        </details>
+      </div>
+    </section>
     <header>
       <div class="brand">APEX<b> /</b></div>
       <div class="eyebrow">Sierra · Gran ruta<br />Ruta nocturna</div>
     </header>
     <div class="controls">
+      <button id="home" aria-label="Volver al menú de inicio">Menú</button>
       <button id="trails" title="Explorar los atajos de tierra">V · Atajos</button>
       <button id="summit" title="Ir al comienzo de la subida al Puerto del Alba">
         M · Montaña
       </button>
       <button id="lights" aria-pressed="true" aria-label="Encender o apagar las luces">
-        L · Luces</button
-      ><button id="camera" aria-label="Cambiar cámara">C · Cámara</button
-      ><button id="reset">R · Volver</button
+        L · Luces
+      </button>
+      <label class="camera-control"
+        ><span>C · Cámara</span>
+        <select
+          id="camera"
+          aria-label="Elegir cámara exterior"
+          title="También puedes cambiar con C o las teclas 1–4"
+        >
+          <option value="0">Seguimiento</option>
+          <option value="1" selected>Amplia</option>
+          <option value="2">Táctica</option>
+          <option value="3">Retrovisor</option>
+        </select>
+      </label>
+      <button id="reset">R · Volver</button
       ><button id="pause" aria-pressed="false">P · Pausa</button>
+    </div>
+    <div class="pursuit-hud" aria-label="Estado de la persecución">
+      <span>PERSECUCIÓN</span><strong id="pursuit-level">INTENSIDAD 1/5</strong>
+      <div class="pursuit-bar"><i id="pursuit-meter"></i></div>
+      <small id="pursuit-distance">ARRANCA PARA COMENZAR</small>
+      <small id="police-direction" class="police-direction">DETRÁS</small>
+      <small class="rear-hint">MANTÉN B · MIRAR ATRÁS</small>
     </div>
     <div class="map-wrap">
       <canvas id="map" width="296" height="224" aria-label="Mapa del circuito"></canvas>
@@ -71,12 +121,9 @@
         <span id="speed" class="speed">0</span><span class="unit">KM/H</span>
       </div>
       <div id="gear" class="gear">N · DETENIDO</div>
+      <div id="speed-limit" class="speed-limit">LÍMITE COMPARTIDO · 100 KM/H</div>
       <div class="bar"><i id="power"></i></div>
       <div id="surface" class="surface">EN PISTA</div>
-      <div id="boost-panel" class="boost-panel">
-        <div id="boost-status">200 KM/H · RECOGE UN RAYO</div>
-        <div class="boost-bar"><i id="boost-meter"></i></div>
-      </div>
       <div id="fps" class="fps" aria-label="Fotogramas por segundo">— FPS</div>
     </div>
     <div class="instructions" id="instructions">
@@ -94,6 +141,21 @@
     <div id="notice" class="notice" role="status"></div>
     <div id="pauseOverlay" class="pause-overlay">
       <strong>En pausa</strong><button id="resume">Continuar</button>
+      <button id="pause-menu" class="secondary-action">Menú de inicio</button>
+    </div>
+    <div
+      id="gameOver"
+      class="game-over"
+      hidden
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="caught-title"
+    >
+      <span class="caught-eyebrow">FIN DE LA PERSECUCIÓN</span>
+      <strong id="caught-title">TE ATRAPARON</strong>
+      <p id="caught-result"></p>
+      <button id="restart">Volver a intentarlo · R</button>
+      <button id="caught-menu" class="secondary-action">Menú de inicio</button>
     </div>
     <div id="loading" class="loading" role="status">
       <strong>APEX / DRIVE</strong

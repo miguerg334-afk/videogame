@@ -1,15 +1,19 @@
 # APEX — Night Drive
 
-Conducción nocturna con un carro deportivo procedural: suspensión por rueda, pintura configurable, faros y velocidad normal máxima de 200 km/h e impulso temporal de 300 km/h. Ruta de montaña de 5,2 km con dos túneles, atajos y una zona explorable de 3,8 × 2,9 km.
+Conducción nocturna con un carro deportivo procedural: suspensión por rueda, pintura configurable, faros y velocidad máxima compartida con la patrulla, de 100 a 120 km/h. Ruta de montaña de 5,2 km con dos túneles, atajos y una zona explorable de 3,8 × 2,9 km.
 
 ## Qué incluye
 
-- Carro deportivo 3D con suspensión, dirección, frenado, reversa y colisiones; 200 km/h normales y 300 km/h con power-up.
-- 47 cristales azules con rayos repartidos por carretera, atajos y montañas, señalados en el minimapa. Se recogen al tocarlos, dan 12 segundos de impulso y reaparecen a los 45 segundos. Otro cristal renueva el efecto; R lo cancela.
-- Indicador de tiempo de impulso junto al velocímetro. Al terminar, vuelve el límite de 200 km/h.
+- Patrulla policial basada en el mismo coche, con carrocería oscura, puertas blancas, rótulos y barra roja/azul animada. Al tocarte termina la partida.
+- Persecución con cinco intensidades: comienza al arrancar, da 3 segundos de margen y aumenta cada 30 segundos; ambos coches comparten exactamente el mismo límite, que crece gradualmente de 100 a 120 km/h en 2 minutos. La patrulla acelera más suavemente para que puedas conservar la ventaja.
+- La patrulla sigue tu recorrido por carretera, atajos y montaña; el minimapa muestra su posición y el HUD su intensidad y distancia. R o el botón de derrota reinician la ronda. V y M también inician una nueva persecución en su destino.
+- Llamas breves en los dos escapes al acelerar fuerte.
+- Carro deportivo 3D con suspensión, dirección, frenado, reversa y colisiones; límite progresivo de 100 a 120 km/h.
 - Circuito de 5,2 km con dos túneles, ascensión y descenso de hasta el 27%.
 - Ambiente nocturno con cielo degradado, luna elevada, cordilleras en tres planos y faros que se pueden encender y apagar.
-- Cámaras de seguimiento y conductor, selector de pintura, teclado y controles táctiles.
+- Menú de inicio con controles y botón de comenzar. La persecución permanece detenida hasta iniciar la partida. Se puede volver al menú desde la partida, pausa o derrota.
+- Selector de cámara en la barra superior, junto a las luces. Cuatro cámaras exteriores: Seguimiento, Amplia, Táctica y Retrovisor. La Táctica encuadra ambos coches cercanos y adapta el encuadre a pantallas verticales. Un indicador muestra la dirección de la policía cuando queda fuera de cámara.
+- Selector de pintura, teclado y controles táctiles.
 - Interior y exterior explorables, sin defensas junto a la carretera, con movimiento por terreno y laderas.
 - Zona de 3,8 × 2,9 km delimitada por un muro de piedra físico con balizas ámbar y perímetro visible en el minimapa.
 - Bosque de 1.800 árboles con corteza, ramas y colisión de troncos; suelo con hierba, tierra y detalle de roca.
@@ -61,7 +65,8 @@ src/main.ts            Arranque asíncrono y gestión de errores
 src/app/               Sesión de conducción y ciclo de vida de eventos
 src/engine/            Renderizador, cámara, matemáticas, tipos y limpieza GPU
 src/character/         Personaje articulado, animación y controlador cinemático
-src/vehicle/           Implementación anterior conservada para referencia y pruebas
+src/vehicle/           Coche activo, física, agrupación de mallas y llamas de escape
+src/police/            Clon policial, ruta de persecución y contacto de captura
 src/world/             Ruta ampliada, terreno continuo, túneles, colliders y luces
 src/ui/                Minimap y acceso tipado al DOM
 src/styles/            Estilos de la interfaz
@@ -95,8 +100,10 @@ Para activarla, copia ese archivo a `.github/workflows/check.yml` desde GitHub o
 | Girar | ← / → o A / D |
 | Freno de mano | Espacio |
 | Faros | L |
-| Cámara de seguimiento / conductor | C |
-| Volver a la carretera | R |
+| Alternar cámaras exteriores | C |
+| Elegir Seguimiento / Amplia / Táctica / Retrovisor | 1 / 2 / 3 / 4 |
+| Reiniciar la persecución en la carretera | R |
+| Mirar atrás mientras conduces | Mantener B |
 | Ir al puerto de montaña | M |
 | Explorar los atajos | V |
 | Cambiar pintura | Selector superior derecho |

@@ -6,12 +6,16 @@ import type { createRenderer } from '../engine/renderer';
 import type { createVehicleModel } from '../vehicle/model.js';
 import type { createMountainWorld } from '../world/mountain.js';
 import type { createDrivingPhysics } from '../vehicle/physics';
-import { BOOST_DURATION } from '../vehicle/physics';
 import { createMinimap } from '../ui/minimap';
 import { constrainChaseCamera } from '../engine/camera';
 import { element } from '../ui/dom';
 import { createLifecycle } from './lifecycle';
-import { createPowerups } from '../world/powerups';
+import { createExhaustFlames } from '../vehicle/exhaust-flames';
+import { freezeWorldTransforms } from '../engine/transforms';
+import { createPoliceModel } from '../police/model';
+import { createPursuit } from '../police/pursuit';
+import { createGameSession } from './session';
+import { DRIVING_CAMERAS, frameDrivingCamera, policeBearing } from '../engine/driving-cameras';
 
 type Dependencies = {
   rendering: ReturnType<typeof createRenderer>;
@@ -39,9 +43,16 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     driveGroundHeight,
   } = mountain;
   const { body, vehicle } = sim;
-  const powerups = createPowerups(scene, mountain);
+  const policeModel = createPoliceModel(model, document);
+  scene.add(policeModel.rig);
+  const police = createPursuit(mountain.world);
+  const session = createGameSession();
+  document.body.classList.add('is-menu');
+  element('startMenu').hidden = false;
+  const exhaustFlames = createExhaustFlames(model.car);
   const lifecycle = createLifecycle();
   const { listen, listenDocument, listenElement } = lifecycle;
+  lifecycle.onDispose(() => police.dispose());
   let animationFrame = 0;
 
   let lightsOn = true;
@@ -52,8 +63,8 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     right: false,
     handbrake: false,
   };
-  let paused = false,
-    cameraMode = 0,
+  let lastPoliceLevel = 1;
+  let cameraMode = 1,
     previousTime = 0,
     accumulator = 0,
     simTime = 0,
@@ -89,21 +100,93 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     noticeTimer = setTimeout(() => (el.style.opacity = '0'), 2700);
   }
   function setPaused(value: boolean) {
-    paused = value;
+    if (session.caught || session.inMenu) return;
+    session.setPaused(value);
     quality.reset();
     clearInput();
     accumulator = 0;
+    lookingBack = false;
     previousTime = performance.now();
-    element('pause').setAttribute('aria-pressed', String(paused));
-    element('pauseOverlay').classList.toggle('show', paused);
-    if (!paused) stage.focus({ preventScroll: true });
+    element('pause').setAttribute('aria-pressed', String(session.paused));
+    element('pauseOverlay').classList.toggle('show', session.paused);
+    if (session.running) stage.focus({ preventScroll: true });
+  }
+  function updateCameraButtons() {
+    element<HTMLSelectElement>('camera').value = String(cameraMode);
+  }
+  function selectCamera(mode: number) {
+    cameraMode = mode;
+    lookingBack = false;
+    cameraSnapped = false;
+    updateCameraButtons();
+    if (!session.inMenu) notice(`Cámara · ${DRIVING_CAMERAS[mode]}`);
+    if (!session.running) draw(0);
   }
   function switchCamera() {
-    cameraMode = (cameraMode + 1) % 2;
-    notice(cameraMode ? 'Cámara del conductor' : 'Cámara de seguimiento');
-    cameraSnapped = false;
+    selectCamera((cameraMode + 1) % DRIVING_CAMERAS.length);
   }
-  let cameraSnapped = false;
+  function beginPlay() {
+    session.start();
+    document.body.classList.remove('is-menu');
+    element('startMenu').hidden = true;
+    resetCar(true);
+    firstDrive = false;
+    element('instructions').style.opacity = '1';
+    notice('Evita el contacto · C cambia la cámara · B mira atrás');
+    stage.focus({ preventScroll: true });
+  }
+  function openMenu() {
+    session.openMenu();
+    document.body.classList.add('is-menu');
+    element('startMenu').hidden = false;
+    element('pauseOverlay').classList.remove('show');
+    element('gameOver').hidden = true;
+    clearInput();
+    accumulator = 0;
+    resetCar(true);
+    updateCameraButtons();
+    draw(0);
+    element('play').focus({ preventScroll: true });
+  }
+  let cameraSnapped = false,
+    lookingBack = false;
+  function resetPursuit(seed?: import('../engine/types').VectorLike[]) {
+    session.resetRound();
+    element('gameOver').hidden = true;
+    lastPoliceLevel = 1;
+    lookingBack = false;
+    lastState = { speed: 0, steering: 0, throttle: 0, contacts: 4, reverse: false, braking: false };
+    if (!seed) {
+      const p = body.translation(),
+        near = nearestTrack(p);
+      const lateral = THREE.MathUtils.clamp(
+        (p.x - near.frame.p.x) * near.frame.normal.x + (p.z - near.frame.p.z) * near.frame.normal.z,
+        -3,
+        3,
+      );
+      const count = Math.ceil(55 / (mountain.trackLength / N));
+      seed = [];
+      for (let i = count; i >= 0; i--) {
+        const f = frames[(near.index - i + N) % N],
+          point = offsetPoint(f, lateral);
+        seed.push({ x: point.x, y: point.y + 0.7, z: point.z });
+      }
+      seed.push(p);
+    }
+    police.reset(seed);
+    lap = 1;
+    setPaused(false);
+  }
+  function losePursuit() {
+    session.lose();
+    clearInput();
+    accumulator = 0;
+    element('pauseOverlay').classList.remove('show');
+    element('caught-result').textContent =
+      `Sobreviviste ${Math.floor(police.elapsed)} s · Intensidad ${police.difficulty.level}/5`;
+    element('gameOver').hidden = false;
+    element('restart').focus({ preventScroll: true });
+  }
   function resetCar(initial = false, destination?: number) {
     const frame =
       destination !== undefined
@@ -124,7 +207,8 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     lastSector = Math.floor(nearest.index / (N / 4));
     nextSector = (lastSector + 1) % 4;
     lapValid = initial || lastSector === 0;
-    if (!initial) notice('De vuelta en pista');
+    resetPursuit();
+    if (!initial) notice('Nueva persecución · Tienes ventaja, ¡arranca!');
   }
   const keys: Record<string, InputAction> = {
     ArrowUp: 'up',
@@ -139,11 +223,22 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
   };
 
   listen('keydown', (event) => {
+    if (session.inMenu || event.target instanceof HTMLSelectElement) return;
+    if (session.caught && event.code !== 'KeyR') return;
+    if (event.code === 'KeyB' && session.running && !lookingBack) {
+      lookingBack = true;
+      cameraSnapped = false;
+      event.preventDefault();
+    }
     if (keys[event.code]) {
       event.preventDefault();
-      if (!paused) input[keys[event.code]] = true;
+      if (session.running) input[keys[event.code]] = true;
     }
     if (!event.repeat) {
+      if (/^Digit[1-4]$/.test(event.code)) {
+        event.preventDefault();
+        selectCamera(Number(event.code.slice(-1)) - 1);
+      }
       if (event.code === 'KeyR') {
         event.preventDefault();
         resetCar();
@@ -166,18 +261,22 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       }
       if (event.code === 'KeyP' || event.code === 'Escape') {
         event.preventDefault();
-        setPaused(!paused);
+        setPaused(!session.paused);
       }
     }
   });
   listen('keyup', (event) => {
+    if (event.code === 'KeyB' && lookingBack) {
+      lookingBack = false;
+      cameraSnapped = false;
+    }
     if (keys[event.code]) {
       event.preventDefault();
       input[keys[event.code]] = false;
     }
   });
   listen('blur', () => {
-    if (!paused) setPaused(true);
+    if (session.running) setPaused(true);
   });
   listenDocument('visibilitychange', () => {
     if (document.hidden) setPaused(true);
@@ -209,21 +308,34 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     cameraSnapped = false;
     lapStart = null;
     lapValid = false;
-    notice('Atajo ' + trail.name + ' · Explora la montaña');
+    resetPursuit(
+      trail.frames
+        .slice(0, 19)
+        .map((frame) => ({ x: frame.p.x, y: frame.p.y + 0.8, z: frame.p.z })),
+    );
+    notice('Atajo ' + trail.name + ' · La policía sigue tus huellas');
     stage.focus({ preventScroll: true });
   }
   listenElement(element('trails'), 'click', visitTrail);
   listenElement(element('summit'), 'click', visitMountain);
   listenElement(element('lights'), 'click', toggleLights);
-  listenElement(element('pause'), 'click', () => setPaused(!paused));
+  listenElement(element('pause'), 'click', () => setPaused(!session.paused));
   listenElement(element('resume'), 'click', () => setPaused(false));
   listenElement(element('reset'), 'click', () => resetCar());
-  listenElement(element('camera'), 'click', switchCamera);
+  listenElement(element('restart'), 'click', () => resetCar());
+  listenElement(element('camera'), 'focus', clearInput);
+  listenElement(element('camera'), 'change', () => {
+    selectCamera(Number(element<HTMLSelectElement>('camera').value));
+    stage.focus({ preventScroll: true });
+  });
+  listenElement(element('play'), 'click', beginPlay);
+  for (const id of ['home', 'pause-menu', 'caught-menu'])
+    listenElement(element(id), 'click', openMenu);
   for (const button of document.querySelectorAll<HTMLButtonElement>('[data-key]')) {
     listenElement(button, 'pointerdown', (e) => {
       e.preventDefault();
       button.setPointerCapture(e.pointerId);
-      if (!paused) input[button.dataset.key as InputAction] = true;
+      if (session.running) input[button.dataset.key as InputAction] = true;
     });
     for (const name of ['pointerup', 'pointercancel', 'lostpointercapture'] as const)
       listenElement(button, name, () => (input[button.dataset.key as InputAction] = false));
@@ -253,7 +365,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     savedPaint = localStorage.getItem('apex-gt-paint') || savedPaint;
   } catch {}
   selectPaint(savedPaint);
-  const drawMap = createMinimap(mapCanvas, frames, mountain.trailNetwork.trails, powerups.entries);
+  const drawMap = createMinimap(mapCanvas, frames, mountain.trailNetwork.trails);
   const skidMat = new THREE.MeshBasicMaterial({
       color: 0x111511,
       transparent: true,
@@ -275,15 +387,28 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
   let measuredFps = 0,
     frameSeconds = 0,
     frameCount = 0;
+  const hudPlayer = new THREE.Vector3(),
+    hudPolice = new THREE.Vector3(),
+    hudRotation = new THREE.Quaternion();
   function updateHUD() {
-    const boost = sim.boostRemaining;
-    element('boost-status').textContent =
-      boost > 0 ? `IMPULSO · 300 KM/H · ${boost.toFixed(1)} s` : '200 KM/H · RECOGE UN RAYO';
-    element('boost-meter').style.width = `${(boost / BOOST_DURATION) * 100}%`;
-    element('boost-panel').classList.toggle('active', boost > 0);
+    const difficulty = police.difficulty,
+      target = body.translation(),
+      pursuer = police.body.translation();
+    const policeDistance = Math.hypot(
+      target.x - pursuer.x,
+      target.y - pursuer.y,
+      target.z - pursuer.z,
+    );
+    element('pursuit-level').textContent = `INTENSIDAD ${difficulty.level}/5`;
+    element('pursuit-distance').textContent = police.started
+      ? `POLICÍA A ${Math.round(policeDistance)} M · ${Math.floor(police.elapsed)} S`
+      : 'ARRANCA PARA COMENZAR';
+    element('pursuit-meter').style.width = `${8 + difficulty.intensity * 92}%`;
     const velocity = body.linvel(),
       speed = Math.hypot(velocity.x, velocity.z) * 3.6;
     speedEl.textContent = String(Math.round(speed));
+    element('speed-limit').textContent =
+      `LÍMITE COMPARTIDO · ${Math.round(sim.speedLimitKmh)} KM/H`;
     gearEl.textContent = lastState.reverse
       ? 'R · REVERSA'
       : speed < 0.5 && !input.up
@@ -322,12 +447,17 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       z: +p.z.toFixed(3),
       speed: +speed.toFixed(2),
       contacts: lastState.contacts,
-      paused,
+      paused: session.paused,
+      phase: session.phase,
+      camera: DRIVING_CAMERAS[cameraMode],
       lightsOn,
       throttle: +lastState.throttle.toFixed(2),
       steer: +lastState.steering.toFixed(3),
-      boostRemaining: +sim.boostRemaining.toFixed(2),
       speedLimit: sim.speedLimitKmh,
+      caught: session.caught,
+      pursuitSeconds: +police.elapsed.toFixed(2),
+      policeLevel: difficulty.level,
+      policeDistance: +policeDistance.toFixed(2),
       fps: measuredFps,
       drawCalls: renderer.info.render.calls,
       triangles: renderer.info.render.triangles,
@@ -337,17 +467,27 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       grade: +nearest.frame.grade.toFixed(3),
       tunnel: tunnelForIndex(nearest.index)?.name || null,
     });
-    drawMap(body.translation(), body.rotation(), simTime);
+    const q = body.rotation();
+    hudPlayer.set(target.x, target.y, target.z);
+    hudPolice.set(pursuer.x, pursuer.y, pursuer.z);
+    hudRotation.set(q.x, q.y, q.z, q.w);
+    element('police-direction').textContent = policeBearing(hudPlayer, hudRotation, hudPolice);
+    drawMap(body.translation(), body.rotation(), police.body.translation(), simTime);
   }
   function physicsTick(dt: number) {
     nearest = nearestTrack(body.translation());
-    const previousPosition = body.translation();
+    police.step(dt, body.translation(), input.up || input.down || Math.abs(lastState.speed) > 0.5);
+    sim.setPursuitTime(police.elapsed);
     lastState = sim.step(input, dt, nearest.distance > 4.2);
     mountain.boundary.enforce(body);
     simTime += dt;
-    if (powerups.collect(previousPosition, body.translation(), simTime)) {
-      sim.activateBoost();
-      notice(`¡IMPULSO! · Hasta 300 km/h durante ${BOOST_DURATION} s`);
+    if (police.touches(body)) {
+      losePursuit();
+      return;
+    }
+    if (police.difficulty.level !== lastPoliceLevel) {
+      lastPoliceLevel = police.difficulty.level;
+      notice(`La policía acelera · Intensidad ${lastPoliceLevel}/5`);
     }
     if (input.up || input.down) {
       if (lapStart === null) lapStart = simTime;
@@ -402,13 +542,24 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
   const cameraTarget = vec(0, 0, 0),
     cameraPosition = vec(0, 0, 0),
     rigQuat = new THREE.Quaternion(),
+    policeCameraPosition = new THREE.Vector3(),
     lookAt = vec(0, 0, 0);
-  function draw(dt: number) {
+  function draw(dt: number, previewTime = simTime) {
     const p = body.translation(),
       q = body.rotation();
     rig.position.set(p.x, p.y, p.z);
     rigQuat.set(q.x, q.y, q.z, q.w);
     rig.quaternion.copy(rigQuat);
+    const policePosition = police.body.translation(),
+      policeRotation = police.body.rotation();
+    policeModel.rig.position.set(policePosition.x, policePosition.y, policePosition.z);
+    policeModel.rig.quaternion.set(
+      policeRotation.x,
+      policeRotation.y,
+      policeRotation.z,
+      policeRotation.w,
+    );
+    policeModel.update(previewTime, police.speed, dt);
     for (let i = 0; i < 4; i++) {
       const length = vehicle.wheelSuspensionLength(i) ?? 0.32;
       wheelAssemblies[i].pivot.position.y = (0.48 + 0.18 - length) / 0.52;
@@ -418,48 +569,51 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     redLED.emissiveIntensity = lastState.braking ? 4 : lightsOn ? 1.5 : 0;
     whiteLED.emissiveIntensity = lightsOn ? 4 : 0;
     tailGlow.intensity = lastState.braking ? 1.6 : lightsOn ? 0.85 : 0;
-    powerups.update(simTime);
+    exhaustFlames.update(
+      dt,
+      simTime,
+      input.up && !lastState.braking && !lastState.reverse && simTime % 1.6 < 0.2,
+      lastState.throttle,
+      lastState.speed,
+    );
     sky.position.copy(camera.position);
-    const forward = vec(1, 0, 0).applyQuaternion(rigQuat),
-      side = vec(0, 0, 1).applyQuaternion(rigQuat);
-    if (cameraMode === 0) {
-      cameraPosition
-        .copy(rig.position)
-        .addScaledVector(forward, -7.8 - Math.min(3, Math.abs(lastState.speed) * 0.06))
-        .addScaledVector(side, 0.6);
-      cameraPosition.y += 3.4;
-      constrainChaseCamera(cameraPosition, mountain, rig.position);
-      cameraTarget.copy(rig.position).addScaledVector(forward, 3.5);
-      cameraTarget.y += 0.55;
-    } else {
-      cameraPosition.copy(rig.position).addScaledVector(forward, 0.34).addScaledVector(side, -0.34);
-      cameraPosition.y += 0.49;
-      cameraTarget.copy(cameraPosition).addScaledVector(forward, 25);
-      cameraTarget.y -= 0.55;
-    }
+    policeCameraPosition.set(policePosition.x, policePosition.y, policePosition.z);
+    const fov = frameDrivingCamera(
+      lookingBack ? 3 : cameraMode,
+      rig.position,
+      rigQuat,
+      policeCameraPosition,
+      lastState.speed,
+      cameraPosition,
+      cameraTarget,
+      camera.aspect,
+    );
+    constrainChaseCamera(cameraPosition, mountain, rig.position);
     if (!cameraSnapped) {
       camera.position.copy(cameraPosition);
       lookAt.copy(cameraTarget);
       cameraSnapped = true;
     } else {
-      camera.position.lerp(cameraPosition, 1 - Math.exp(-dt * (cameraMode ? 20 : 5)));
+      camera.position.lerp(cameraPosition, 1 - Math.exp(-dt * 6));
       lookAt.lerp(cameraTarget, 1 - Math.exp(-dt * 8));
     }
-    if (cameraMode === 0) constrainChaseCamera(camera.position, mountain, rig.position);
+    constrainChaseCamera(camera.position, mountain, rig.position);
     camera.lookAt(lookAt);
-    camera.fov = 58 + Math.min(8, Math.abs(lastState.speed) * 0.14);
+    camera.fov = fov;
     camera.updateProjectionMatrix();
     key.position.copy(rig.position).add(sunOffset);
     key.target.position.copy(rig.position);
     updateTunnelLights(rig.position);
+    updateMovingTransforms();
     renderer.render(scene, camera);
   }
+  let lastMenuFrame = 0;
   function animate(now: number) {
     animationFrame = requestAnimationFrame(animate);
     const rawDt = (now - previousTime) / 1000 || 0;
     const dt = Math.min(rawDt, 0.1);
     previousTime = now;
-    if (!paused) {
+    if (session.running) {
       frameSeconds += rawDt;
       frameCount++;
       if (frameSeconds >= 1) {
@@ -473,9 +627,17 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       let steps = 0;
       while (accumulator >= 1 / 120 && steps++ < 8) {
         physicsTick(1 / 120);
+        if (session.caught) {
+          accumulator = 0;
+          break;
+        }
         accumulator -= 1 / 120;
       }
       draw(dt);
+    } else if (session.inMenu && now - lastMenuFrame >= 1000 / 30 && !document.hidden) {
+      // A live preview without advancing physics, survival time or police intensity.
+      lastMenuFrame = now;
+      draw(0, now / 1000);
     }
     if (now - lastHud > 100) {
       lastHud = now;
@@ -496,23 +658,21 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     element('loadText').textContent =
       'Se perdió el contexto gráfico. Recarga la página para continuar.';
   });
-  // The world is static; only the car, sky and moving light targets need transforms.
-  for (const root of scene.children) {
-    if (
-      root === rig ||
-      root === sky ||
-      root === key.target ||
-      root.name === 'powerup-300' ||
-      root instanceof THREE.Light
-    )
-      continue;
-    root.traverse((object) => {
-      object.updateMatrix();
-      object.matrixAutoUpdate = false;
-    });
-  }
+  const updateMovingTransforms = freezeWorldTransforms(
+    scene,
+    scene.children.filter(
+      (root) =>
+        root === rig ||
+        root === policeModel.rig ||
+        root === sky ||
+        root === key.target ||
+        root instanceof THREE.Light,
+    ),
+  );
   resetCar(true);
   for (let i = 0; i < 90; i++) sim.step(input, 1 / 120);
+  // Warm up materials, including off-screen scenery and exhaust, while loading.
+  renderer.compile(scene, camera);
   draw(0);
   updateHUD();
   element('loading').style.display = 'none';
@@ -522,7 +682,8 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     duration: 0.6,
     stagger: 0.04,
   });
-  stage.focus({ preventScroll: true });
+  updateCameraButtons();
+  element('play').focus({ preventScroll: true });
   previousTime = performance.now();
   animationFrame = requestAnimationFrame(animate);
 

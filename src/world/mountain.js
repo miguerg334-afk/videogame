@@ -143,7 +143,11 @@ export function createMountainWorld(scene, car, document) {
     scene.add(m);
     if (collider)
       world.createCollider(
-        R.ColliderDesc.trimesh(new Float32Array(v), new Uint32Array(indices)).setFriction(1),
+        R.ColliderDesc.trimesh(
+          new Float32Array(v),
+          new Uint32Array(indices),
+          R.TriMeshFlags.FIX_INTERNAL_EDGES,
+        ).setFriction(1),
       );
     return m;
   }
@@ -297,7 +301,11 @@ export function createMountainWorld(scene, car, document) {
     // Both visible shells are solid: outside driving and camera rays must meet
     // the same surface that is rendered, including the rock cover and roof.
     world.createCollider(
-      R.ColliderDesc.trimesh(new Float32Array(vertices), new Uint32Array(indices)).setFriction(0.5),
+      R.ColliderDesc.trimesh(
+        new Float32Array(vertices),
+        new Uint32Array(indices),
+        R.TriMeshFlags.FIX_INTERNAL_EDGES,
+      ).setFriction(0.5),
     );
     return cross;
   }

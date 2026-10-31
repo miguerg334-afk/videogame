@@ -458,27 +458,361 @@ header {
   font-variant-numeric: tabular-nums;
 }
 
-.boost-panel {
-  margin-top: 12px;
+.pursuit-hud {
+  position: fixed;
+  top: 78px;
+  left: 28px;
+  width: 196px;
+  padding: 12px 14px;
+  background: #102031d9;
+  border: 1px solid #789bbd55;
+  border-radius: 10px;
+  pointer-events: none;
+}
+.pursuit-hud span,
+.pursuit-hud small {
+  display: block;
   font-size: 8px;
-  letter-spacing: 0.06em;
-  color: #9ab7c0;
+  letter-spacing: 1.2px;
+  color: #b2c4d8;
 }
-.boost-panel.active {
-  color: #7ae5ff;
+.pursuit-hud strong {
+  display: block;
+  font-size: 12px;
+  margin-top: 6px;
+  letter-spacing: 1px;
+  color: #eff5ff;
 }
-.boost-bar {
+.pursuit-bar {
   height: 3px;
-  margin-top: 7px;
-  background: #ffffff12;
-  border-radius: 3px;
-  overflow: hidden;
+  background: #ffffff18;
+  margin: 10px 0 8px;
 }
-.boost-bar i {
+.pursuit-bar i {
   display: block;
   height: 100%;
-  width: 0;
-  background: #65ddff;
-  box-shadow: 0 0 8px #65ddff;
-  transition: width 0.1s linear;
+  width: 8%;
+  background: linear-gradient(90deg, #65acff, #ff516e);
+  transition: width 0.3s;
+}
+.instructions {
+  top: 188px;
+}
+.game-over {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  padding: 25px;
+  gap: 15px;
+  background: #060d1cce;
+  backdrop-filter: blur(5px);
+}
+.game-over[hidden] {
+  display: none;
+}
+.caught-eyebrow {
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: #f088a0;
+}
+.game-over strong {
+  font-size: clamp(32px, 6vw, 64px);
+  letter-spacing: -2px;
+}
+.game-over p {
+  margin: 0 0 10px;
+  color: #c2d1e2;
+  font-size: 13px;
+}
+.game-over button {
+  border: 1px solid #c3dcff60;
+  border-radius: 10px;
+  padding: 15px 24px;
+  background: #e1edff;
+  color: #101d30;
+}
+@media (max-width: 800px) {
+  .pursuit-hud {
+    left: 18px;
+    top: 72px;
+    width: 157px;
+    padding: 9px 10px;
+  }
+  .pursuit-hud span,
+  .pursuit-hud small {
+    font-size: 7px;
+    letter-spacing: 0.5px;
+  }
+  .pursuit-hud strong {
+    font-size: 10px;
+  }
+  .instructions {
+    top: 180px;
+  }
+}
+
+.rear-hint {
+  margin-top: 7px;
+  opacity: 0.7;
+}
+.instructions {
+  top: 208px;
+}
+@media (max-width: 800px) {
+  .instructions {
+    top: 198px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pursuit-hud {
+    top: 120px;
+  }
+  .instructions {
+    top: 240px;
+  }
+}
+
+/* The start screen uses the live scene; the pursuit stays frozen until Play. */
+body.is-menu header,
+body.is-menu .controls,
+body.is-menu .pursuit-hud,
+body.is-menu .map-wrap,
+body.is-menu .paint-picker,
+body.is-menu .telemetry,
+body.is-menu .instructions,
+body.is-menu .touch,
+body.is-menu .notice {
+  visibility: hidden;
+  pointer-events: none;
+}
+.start-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 16;
+  display: flex;
+  align-items: flex-start;
+  overflow-y: auto;
+  padding: clamp(20px, 4vw, 64px);
+  background: linear-gradient(90deg, #030912f5 0%, #030912c9 35%, #03091230 75%);
+}
+.start-menu[hidden] {
+  display: none;
+}
+.menu-panel {
+  width: 448px;
+  max-width: 100%;
+  margin-block: auto;
+  padding: 28px;
+  border: 1px solid #a0c1e32b;
+  border-radius: 20px;
+  background: #081323c4;
+}
+.menu-brand {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #d6e6f6;
+}
+.menu-brand b {
+  color: #6eb5ff;
+  padding-inline: 5px;
+}
+.menu-kicker {
+  display: block;
+  margin-top: 28px;
+  color: #8aaccb;
+  font-size: 8px;
+  letter-spacing: 2px;
+}
+.menu-panel h1 {
+  font-size: clamp(40px, 5vw, 66px);
+  line-height: 0.93;
+  letter-spacing: -3px;
+  margin: 12px 0 18px;
+}
+.menu-panel h1 em {
+  font-style: normal;
+  color: #a7ceff;
+}
+.menu-description {
+  color: #c0cbd9;
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0;
+  max-width: 340px;
+}
+.menu-rule {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  font-size: 10px;
+  line-height: 1.6;
+  color: #e5bbc5;
+  margin-top: 15px;
+}
+.police-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff5b7a;
+  box-shadow: 0 0 10px #ff5b7a90;
+  flex-shrink: 0;
+}
+.play-button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 0;
+  border-radius: 9px;
+  padding: 16px;
+  color: #091729;
+  background: #c5ddff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.play-button:hover {
+  background: #e1edff;
+}
+.play-button span {
+  font-size: 20px;
+  line-height: 1;
+}
+.menu-help {
+  color: #a5b9d0;
+  font-size: 10px;
+  line-height: 1.8;
+  margin-top: 18px;
+}
+.menu-help summary {
+  cursor: pointer;
+}
+.menu-help p {
+  margin-bottom: 0;
+}
+.menu-help kbd {
+  font: inherit;
+  color: #dce9f9;
+}
+.police-direction {
+  color: #a9cfff !important;
+  margin-top: 5px;
+}
+.pause-overlay button.secondary-action,
+.game-over button.secondary-action {
+  background: transparent;
+  color: #c9d9eb;
+  border: 1px solid #abc9ef35;
+}
+.instructions {
+  top: 228px;
+}
+@media (max-width: 800px) {
+  .start-menu {
+    padding: 20px;
+    background: #040b16c9;
+  }
+  .menu-panel {
+    padding: 22px;
+    width: 400px;
+  }
+  .menu-kicker {
+    margin-top: 22px;
+  }
+  .instructions {
+    top: 224px;
+  }
+}
+@media (max-width: 480px) {
+  .start-menu {
+    padding: 14px;
+  }
+  .menu-panel {
+    padding: 20px 17px;
+  }
+  .controls {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    max-width: calc(100vw - 105px);
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .controls button {
+    flex-shrink: 0;
+  }
+  .instructions {
+    top: 260px;
+  }
+}
+
+.play-button {
+  margin-top: 24px;
+}
+.camera-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  border: 1px solid #ffffff35;
+  background: #152321bf;
+  backdrop-filter: blur(10px);
+  border-radius: 9px;
+  padding: 0 10px;
+}
+.camera-control span {
+  font-size: 9px;
+  color: #b6c9d7;
+  white-space: nowrap;
+}
+.camera-control select {
+  font: inherit;
+  font-size: 11px;
+  padding: 10px 2px;
+  color: #e3efff;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  color-scheme: dark;
+}
+.camera-control select option {
+  background: #152321;
+  color: #e3efff;
+}
+.camera-control select:focus-visible {
+  outline: 2px solid #dbf6a7;
+  outline-offset: 2px;
+}
+@media (max-width: 800px) {
+  .camera-control {
+    padding: 0 7px;
+    gap: 5px;
+  }
+  .camera-control span {
+    font-size: 8px;
+  }
+  .camera-control select {
+    font-size: 9px;
+    padding: 9px 0;
+  }
+}
+@media (max-width: 480px) {
+  .camera-control span {
+    font-size: 7px;
+  }
+  .camera-control select {
+    font-size: 8px;
+    padding: 8px 0;
+  }
+}
+
+.speed-limit {
+  margin-top: 8px;
+  font-size: 8px;
+  color: #a8c8e6;
+  letter-spacing: 0.25px;
 }

@@ -27,7 +27,11 @@ test('modelo procedural completo: cuatro ruedas, carrocería y geometría finita
       const positions = object.geometry.getAttribute('position');
       if (positions) assert(Array.from(positions.array).every(Number.isFinite));
     });
-    assert(meshes > 100, 'conserva el detalle procedural');
+    const before = model.batching.reduce((n, b) => n + b.before, 0),
+      after = model.batching.reduce((n, b) => n + b.after, 0);
+    console.log({ meshes, beforeBatching: before, afterBatching: after });
+    assert(after < before * 0.3, 'reduce las llamadas de dibujo sin quitar piezas');
+    assert(meshes > 20, 'conserva ruedas, cristales y piezas móviles');
     assert(model.paint instanceof THREE.MeshPhysicalMaterial);
   } finally {
     disposeScene(scene);

@@ -2,11 +2,12 @@ import R from '@dimforge/rapier3d-compat/rapier.es.js';
 import { rotateVector } from '../engine/math';
 import type { DrivingInput, DrivingState, VectorLike } from '../engine/types';
 
-export const MAX_SPEED_KMH = 200;
-export const BOOST_SPEED_KMH = 300;
-export const BOOST_DURATION = 12;
+import { START_SPEED_KMH, pursuitSpeedLimitKmh } from '../engine/speed';
+export { MAX_SPEED_KMH } from '../engine/speed';
 
 export function createDrivingPhysics(world: R.World) {
+  // CCD may need more than one impact in a step at tunnel walls or rough ground.
+  world.integrationParameters.maxCcdSubsteps = 4;
   const body = world.createRigidBody(
     R.RigidBodyDesc.dynamic()
       .setTranslation(0, 1, 0)
@@ -54,11 +55,9 @@ export function createDrivingPhysics(world: R.World) {
     reverse = false,
     speed = 0,
     braking = false,
-    boostRemaining = 0;
+    speedLimitKmh = START_SPEED_KMH;
   function step(input: DrivingInput, dt: number, offroad = false): DrivingState {
-    boostRemaining = Math.max(0, boostRemaining - dt);
-    const boosting = boostRemaining > 0;
-    const maxSpeed = (boosting ? BOOST_SPEED_KMH : MAX_SPEED_KMH) / 3.6;
+    const maxSpeed = speedLimitKmh / 3.6;
     const velocity = body.linvel(),
       q = body.rotation(),
       forward = rotateVector(q, { x: 1, y: 0, z: 0 });
@@ -89,8 +88,8 @@ export function createDrivingPhysics(world: R.World) {
     throttle += (drive - throttle) * Math.min(1, dt * 3.8);
     const powerDrop = reverse
         ? Math.max(0.18, 1 - Math.abs(speed) / 69)
-        : Math.max(boosting ? 0.8 : 0.72, 1 - Math.abs(speed) / 180),
-      force = throttle * (reverse ? 2200 : boosting ? 12000 : 8000) * powerDrop;
+        : Math.max(0.72, 1 - Math.abs(speed) / 180),
+      force = throttle * (reverse ? 2200 : 8000) * powerDrop;
     for (let i = 0; i < 4; i++) {
       const front = wheels[i].front;
       vehicle.setWheelSteering(i, front ? steering : 0);
@@ -116,7 +115,10 @@ export function createDrivingPhysics(world: R.World) {
         true,
       );
     }
-    vehicle.updateVehicle(dt, R.QueryFilterFlags.EXCLUDE_DYNAMIC);
+    vehicle.updateVehicle(
+      dt,
+      R.QueryFilterFlags.EXCLUDE_DYNAMIC | R.QueryFilterFlags.EXCLUDE_SENSORS,
+    );
     world.timestep = dt;
     world.step();
     body.resetForces(true);
@@ -162,7 +164,7 @@ export function createDrivingPhysics(world: R.World) {
     body.resetTorques(true);
     steering = throttle = speed = 0;
     reverse = false;
-    boostRemaining = 0;
+    speedLimitKmh = START_SPEED_KMH;
   }
   function dispose() {
     world.removeVehicleController(vehicle);
@@ -174,14 +176,11 @@ export function createDrivingPhysics(world: R.World) {
     step,
     reset,
     dispose,
-    activateBoost() {
-      boostRemaining = BOOST_DURATION;
-    },
-    get boostRemaining() {
-      return boostRemaining;
+    setPursuitTime(seconds: number) {
+      speedLimitKmh = pursuitSpeedLimitKmh(seconds);
     },
     get speedLimitKmh() {
-      return boostRemaining > 0 ? BOOST_SPEED_KMH : MAX_SPEED_KMH;
+      return speedLimitKmh;
     },
   };
 }

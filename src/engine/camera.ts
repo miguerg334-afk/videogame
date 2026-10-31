@@ -60,7 +60,7 @@ export function constrainChaseCamera(
     new R.Ray(origin, direction),
     distance,
     true,
-    R.QueryFilterFlags.EXCLUDE_DYNAMIC,
+    R.QueryFilterFlags.EXCLUDE_DYNAMIC | R.QueryFilterFlags.EXCLUDE_SENSORS,
   );
   if (hit) {
     const safeDistance = Math.max(0, hit.timeOfImpact - 0.95);
