@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { element } from '../ui/dom';
-import { createAdaptiveQuality } from './quality';
+import { createAdaptiveQuality, renderRatioLimit } from './quality';
 
 export function createRenderer() {
   const stage = element('stage'),
@@ -8,17 +8,19 @@ export function createRenderer() {
   scene.background = new THREE.Color(0x02050e);
   scene.fog = new THREE.FogExp2(0x14283d, 0.00065);
   const renderer = new THREE.WebGLRenderer({
-    antialias: true,
+    antialias: false,
     powerPreference: 'high-performance',
   });
-  const quality = createAdaptiveQuality(Math.min(devicePixelRatio, 1.25));
+  const quality = createAdaptiveQuality(
+    renderRatioLimit(innerWidth, innerHeight, devicePixelRatio),
+  );
   renderer.setPixelRatio(quality.ratio);
   renderer.setSize(innerWidth, innerHeight);
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.95;
   renderer.physicallyCorrectLights = true;
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = false;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   stage.appendChild(renderer.domElement);
   const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.08, 8500),

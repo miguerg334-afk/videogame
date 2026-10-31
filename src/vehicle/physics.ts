@@ -1,4 +1,5 @@
 import R from '@dimforge/rapier3d-compat/rapier.es.js';
+import { recoveryPose } from './recovery';
 import { rotateVector } from '../engine/math';
 import type { DrivingInput, DrivingState, VectorLike } from '../engine/types';
 
@@ -176,6 +177,17 @@ export function createDrivingPhysics(world: R.World) {
     step,
     reset,
     dispose,
+    recover(fallbackHeight: (x: number, z: number) => number) {
+      const pose = recoveryPose(world, body, fallbackHeight);
+      body.setTranslation(pose.position, true);
+      body.setRotation(pose.rotation, true);
+      body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      body.resetForces(true);
+      body.resetTorques(true);
+      steering = throttle = speed = 0;
+      reverse = braking = false;
+    },
     setPursuitTime(seconds: number) {
       speedLimitKmh = pursuitSpeedLimitKmh(seconds);
     },

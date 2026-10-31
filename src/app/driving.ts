@@ -11,10 +11,12 @@ import { constrainChaseCamera } from '../engine/camera';
 import { element } from '../ui/dom';
 import { createLifecycle } from './lifecycle';
 import { createExhaustFlames } from '../vehicle/exhaust-flames';
+import { createContactShadow } from '../vehicle/contact-shadow';
 import { freezeWorldTransforms } from '../engine/transforms';
 import { createPoliceModel } from '../police/model';
 import { createPursuit } from '../police/pursuit';
 import { createGameSession } from './session';
+import { renderRatioLimit } from '../engine/quality';
 import { DRIVING_CAMERAS, frameDrivingCamera, policeBearing } from '../engine/driving-cameras';
 
 type Dependencies = {
@@ -50,6 +52,8 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
   document.body.classList.add('is-menu');
   element('startMenu').hidden = false;
   const exhaustFlames = createExhaustFlames(model.car);
+  const carShadow = createContactShadow(rig);
+  createContactShadow(policeModel.rig);
   const lifecycle = createLifecycle();
   const { listen, listenDocument, listenElement } = lifecycle;
   lifecycle.onDispose(() => police.dispose());
@@ -150,29 +154,27 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
   }
   let cameraSnapped = false,
     lookingBack = false;
-  function resetPursuit(seed?: import('../engine/types').VectorLike[]) {
+  function resetPursuit() {
     session.resetRound();
     element('gameOver').hidden = true;
     lastPoliceLevel = 1;
     lookingBack = false;
     lastState = { speed: 0, steering: 0, throttle: 0, contacts: 4, reverse: false, braking: false };
-    if (!seed) {
-      const p = body.translation(),
-        near = nearestTrack(p);
-      const lateral = THREE.MathUtils.clamp(
-        (p.x - near.frame.p.x) * near.frame.normal.x + (p.z - near.frame.p.z) * near.frame.normal.z,
-        -3,
-        3,
-      );
-      const count = Math.ceil(55 / (mountain.trackLength / N));
-      seed = [];
-      for (let i = count; i >= 0; i--) {
-        const f = frames[(near.index - i + N) % N],
-          point = offsetPoint(f, lateral);
-        seed.push({ x: point.x, y: point.y + 0.7, z: point.z });
-      }
-      seed.push(p);
+    const p = body.translation(),
+      near = nearestTrack(p);
+    const lateral = THREE.MathUtils.clamp(
+      (p.x - near.frame.p.x) * near.frame.normal.x + (p.z - near.frame.p.z) * near.frame.normal.z,
+      -3,
+      3,
+    );
+    const count = Math.ceil(55 / (mountain.trackLength / N));
+    const seed: import('../engine/types').VectorLike[] = [];
+    for (let i = count; i >= 0; i--) {
+      const f = frames[(near.index - i + N) % N],
+        point = offsetPoint(f, lateral);
+      seed.push({ x: point.x, y: point.y + 0.7, z: point.z });
     }
+    seed.push(p);
     police.reset(seed);
     lap = 1;
     setPaused(false);
@@ -187,13 +189,8 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     element('gameOver').hidden = false;
     element('restart').focus({ preventScroll: true });
   }
-  function resetCar(initial = false, destination?: number) {
-    const frame =
-      destination !== undefined
-        ? frames[destination]
-        : initial
-          ? frames[Math.round(N * 0.055)]
-          : nearestTrack(body.translation()).frame;
+  function resetCar(initial = false) {
+    const frame = initial ? frames[Math.round(N * 0.055)] : nearestTrack(body.translation()).frame;
     const p = offsetPoint(frame, initial ? 2.15 : 0);
     sim.reset(
       { x: p.x, y: p.y + 0.7, z: p.z },
@@ -209,6 +206,16 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     lapValid = initial || lastSector === 0;
     resetPursuit();
     if (!initial) notice('Nueva persecución · Tienes ventaja, ¡arranca!');
+  }
+  function recoverCar() {
+    if (session.inMenu || session.caught) return;
+    sim.recover(driveGroundHeight);
+    clearInput();
+    lastState = { speed: 0, steering: 0, throttle: 0, contacts: 0, reverse: false, braking: false };
+    cameraSnapped = false;
+    notice('Coche enderezado en el mismo lugar');
+    if (!session.running) draw(0);
+    stage.focus({ preventScroll: true });
   }
   const keys: Record<string, InputAction> = {
     ArrowUp: 'up',
@@ -239,17 +246,13 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
         event.preventDefault();
         selectCamera(Number(event.code.slice(-1)) - 1);
       }
+      if (event.code === 'KeyF') {
+        event.preventDefault();
+        recoverCar();
+      }
       if (event.code === 'KeyR') {
         event.preventDefault();
         resetCar();
-      }
-      if (event.code === 'KeyV') {
-        event.preventDefault();
-        visitTrail();
-      }
-      if (event.code === 'KeyM') {
-        event.preventDefault();
-        visitMountain();
       }
       if (event.code === 'KeyL') {
         event.preventDefault();
@@ -288,40 +291,11 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     notice(lightsOn ? 'Luces encendidas' : 'Luces apagadas');
     stage.focus({ preventScroll: true });
   }
-  function visitMountain() {
-    resetCar(false, mountain.mountainStart);
-    notice('Puerto del Alba · Comienza la ascensión');
-    stage.focus({ preventScroll: true });
-  }
-  let trailDestination = 0;
-  function visitTrail() {
-    const trail =
-      mountain.trailNetwork.trails[trailDestination++ % mountain.trailNetwork.trails.length];
-    const f = trail.frames[18];
-    sim.reset(
-      { x: f.p.x, y: f.p.y + 0.8, z: f.p.z },
-      -Math.atan2(f.tangent.z, f.tangent.x),
-      f.grade,
-    );
-    clearInput();
-    nearest = nearestTrack(f.p);
-    cameraSnapped = false;
-    lapStart = null;
-    lapValid = false;
-    resetPursuit(
-      trail.frames
-        .slice(0, 19)
-        .map((frame) => ({ x: frame.p.x, y: frame.p.y + 0.8, z: frame.p.z })),
-    );
-    notice('Atajo ' + trail.name + ' · La policía sigue tus huellas');
-    stage.focus({ preventScroll: true });
-  }
-  listenElement(element('trails'), 'click', visitTrail);
-  listenElement(element('summit'), 'click', visitMountain);
   listenElement(element('lights'), 'click', toggleLights);
   listenElement(element('pause'), 'click', () => setPaused(!session.paused));
   listenElement(element('resume'), 'click', () => setPaused(false));
   listenElement(element('reset'), 'click', () => resetCar());
+  listenElement(element('recover'), 'click', recoverCar);
   listenElement(element('restart'), 'click', () => resetCar());
   listenElement(element('camera'), 'focus', clearInput);
   listenElement(element('camera'), 'change', () => {
@@ -418,7 +392,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     const up = rotateVector(body.rotation(), { x: 0, y: 1, z: 0 });
     surfaceEl.textContent =
       up.y < 0.25
-        ? 'VOLCADO · PULSA R'
+        ? 'VOLCADO · PULSA F'
         : lastState.contacts === 0
           ? 'EN AIRE'
           : nearest.distance > 4.2
@@ -460,6 +434,8 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       policeDistance: +policeDistance.toFixed(2),
       fps: measuredFps,
       drawCalls: renderer.info.render.calls,
+      physicsHz: 120,
+      activeTreeColliders: mountain.forest.activeColliderCount,
       triangles: renderer.info.render.triangles,
       pixelRatio: renderer.getPixelRatio(),
       distance: +nearest.distance.toFixed(2),
@@ -475,6 +451,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     drawMap(body.translation(), body.rotation(), police.body.translation(), simTime);
   }
   function physicsTick(dt: number) {
+    mountain.forest.updateColliders(body.translation());
     nearest = nearestTrack(body.translation());
     police.step(dt, body.translation(), input.up || input.down || Math.abs(lastState.speed) > 0.5);
     sim.setPursuitTime(police.elapsed);
@@ -512,7 +489,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       lastSector = sector;
     }
     if (body.translation().y < driveGroundHeight(body.translation().x, body.translation().z) - 8)
-      resetCar();
+      recoverCar();
     skidAccumulator += dt;
     if (skidAccumulator > 0.05) {
       skidAccumulator = 0;
@@ -566,6 +543,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       wheelAssemblies[i].pivot.rotation.y = vehicle.wheelSteering(i) ?? 0;
       wheelAssemblies[i].roll.rotation.z = -(vehicle.wheelRotation(i) ?? 0);
     }
+    carShadow.visible = lastState.contacts > 1;
     redLED.emissiveIntensity = lastState.braking ? 4 : lightsOn ? 1.5 : 0;
     whiteLED.emissiveIntensity = lightsOn ? 4 : 0;
     tailGlow.intensity = lastState.braking ? 1.6 : lightsOn ? 0.85 : 0;
@@ -647,6 +625,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
   listen('resize', () => {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
+    quality.resize(renderRatioLimit(innerWidth, innerHeight, devicePixelRatio));
     renderer.setPixelRatio(quality.ratio);
     renderer.setSize(innerWidth, innerHeight);
     cameraSnapped = false;
@@ -670,6 +649,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     ),
   );
   resetCar(true);
+  mountain.forest.updateColliders(body.translation());
   for (let i = 0; i < 90; i++) sim.step(input, 1 / 120);
   // Warm up materials, including off-screen scenery and exhaust, while loading.
   renderer.compile(scene, camera);

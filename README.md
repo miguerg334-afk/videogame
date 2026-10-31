@@ -6,7 +6,8 @@ Conducción nocturna con un carro deportivo procedural: suspensión por rueda, p
 
 - Patrulla policial basada en el mismo coche, con carrocería oscura, puertas blancas, rótulos y barra roja/azul animada. Al tocarte termina la partida.
 - Persecución con cinco intensidades: comienza al arrancar, da 3 segundos de margen y aumenta cada 30 segundos; ambos coches comparten exactamente el mismo límite, que crece gradualmente de 100 a 120 km/h en 2 minutos. La patrulla acelera más suavemente para que puedas conservar la ventaja.
-- La patrulla sigue tu recorrido por carretera, atajos y montaña; el minimapa muestra su posición y el HUD su intensidad y distancia. R o el botón de derrota reinician la ronda. V y M también inician una nueva persecución en su destino.
+- La patrulla sigue tu recorrido por carretera, atajos y montaña; el minimapa muestra su posición y el HUD su intensidad y distancia. R o el botón de derrota reinician la ronda. La recuperación automática de caídas conserva la dificultad y el tiempo de persecución.
+- Botón F · Enderezar: levanta el coche en sus mismas coordenadas, conserva la orientación sobre la pendiente y no reinicia la persecución ni el límite de velocidad.
 - Llamas breves en los dos escapes al acelerar fuerte.
 - Carro deportivo 3D con suspensión, dirección, frenado, reversa y colisiones; límite progresivo de 100 a 120 km/h.
 - Circuito de 5,2 km con dos túneles, ascensión y descenso de hasta el 27%.
@@ -18,10 +19,10 @@ Conducción nocturna con un carro deportivo procedural: suspensión por rueda, p
 - Zona de 3,8 × 2,9 km delimitada por un muro de piedra físico con balizas ámbar y perímetro visible en el minimapa.
 - Bosque de 1.800 árboles con corteza, ramas y colisión de troncos; suelo con hierba, tierra y detalle de roca.
 - Renderizado por sectores: terreno sin recortes de geometría, árboles detallados cercanos, siluetas lejanas y descarte de sectores fuera de cámara.
-- Resolución adaptativa, sombras acotadas y contador de FPS. La física conserva su paso de 120 Hz; los fotogramas muy lentos tienen un límite de recuperación para evitar una acumulación de trabajo.
+- Resolución adaptativa con presupuesto de píxeles, sombras de contacto ligeras y contador de FPS. Las colisiones de árboles se activan alrededor del jugador. La física conserva su paso de 120 Hz; los fotogramas muy lentos tienen un límite de recuperación para evitar una acumulación de trabajo.
 - Tres atajos de tierra: Mirador, Pinar y Cumbre; accesos libres y caminos visibles en el minimapa.
 - Bosques con troncos texturados, ramas, copas variadas y colisiones en los troncos.
-- Minimap, telemetría y acceso directo a la subida con M y a los atajos con V.
+- Minimap y telemetría; las montañas y los atajos se exploran conduciendo, sin teletransportes.
 - Asfalto con áridos y desgaste, drenajes y reflectores; refuerzos de acero y tornillería en los túneles.
 
 ## Ejecutar
@@ -102,10 +103,9 @@ Para activarla, copia ese archivo a `.github/workflows/check.yml` desde GitHub o
 | Faros | L |
 | Alternar cámaras exteriores | C |
 | Elegir Seguimiento / Amplia / Táctica / Retrovisor | 1 / 2 / 3 / 4 |
+| Enderezar el coche en el mismo lugar | F o botón Enderezar |
 | Reiniciar la persecución en la carretera | R |
 | Mirar atrás mientras conduces | Mantener B |
-| Ir al puerto de montaña | M |
-| Explorar los atajos | V |
 | Cambiar pintura | Selector superior derecho |
 | Pausa | P o Esc |
 

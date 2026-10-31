@@ -180,6 +180,7 @@ export function createMountainWorld(scene, car, document) {
   addRoadDetails(scene, frames, offsetPoint, trackLength);
   buildMountainTrails(scene, world, trailNetwork, document);
   const forest = createForest(scene, world, document, terrainHeight, nearestTrack, trailNetwork);
+  forest.updateColliders(frames[0].p);
   const boundary = createWorldBoundary(scene, world, terrainHeight);
   // Starting line and a lightweight track gantry.
   const start = frames[0];
@@ -537,6 +538,5 @@ export function createMountainWorld(scene, car, document) {
     trailNetwork,
     forest,
     boundary,
-    mountainStart: frames.findIndex((f) => f.p.x > 810 && f.p.z > 100),
   };
 }

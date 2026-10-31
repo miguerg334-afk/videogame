@@ -59,13 +59,13 @@ export function addForestLOD(
   positions: { x: number; y: number; z: number; h: number }[],
 ) {
   const cells = new Map<string, { x: number; z: number; trees: typeof positions }>();
-  const cellKey = (x: number, z: number) => `${Math.floor(x / 160)},${Math.floor(z / 160)}`;
+  const cellKey = (x: number, z: number) => `${Math.floor(x / 240)},${Math.floor(z / 240)}`;
   for (const p of positions) {
     const key = cellKey(p.x, p.z);
     if (!cells.has(key))
       cells.set(key, {
-        x: (Math.floor(p.x / 160) + 0.5) * 160,
-        z: (Math.floor(p.z / 160) + 0.5) * 160,
+        x: (Math.floor(p.x / 240) + 0.5) * 240,
+        z: (Math.floor(p.z / 240) + 0.5) * 240,
         trees: [],
       });
     cells.get(key)!.trees.push(p);
@@ -79,8 +79,8 @@ export function addForestLOD(
       cell.z,
     );
     lod.addLevel(new THREE.Group(), 0);
-    lod.addLevel(new THREE.Group(), 300);
-    lod.addLevel(new THREE.Group(), 1400);
+    lod.addLevel(new THREE.Group(), 220);
+    lod.addLevel(new THREE.Group(), 1100);
     lods.set(key, lod);
     scene.add(lod);
   }

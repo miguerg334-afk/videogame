@@ -112,11 +112,6 @@ export function createForest(
     object.scale.set(1, p.h * 0.96, 1);
     object.updateMatrix();
     trunks.setMatrixAt(index, object.matrix);
-    world.createCollider(
-      R.ColliderDesc.cylinder(p.h * 0.44, 0.22)
-        .setTranslation(p.x, p.y + p.h * 0.44, p.z)
-        .setFriction(0.7),
-    );
     for (let tier = 0; tier < 4; tier++) {
       const fraction = 0.33 + tier * 0.16,
         radius = p.pine ? p.h * (0.27 - tier * 0.046) : p.h * (0.19 + Math.sin(tier) * 0.045);
@@ -174,5 +169,41 @@ export function createForest(
     mesh.receiveShadow = true;
   }
   const lod = addForestLOD(scene, [trunks, branches, foliage, tips], positions);
-  return { count: positions.length, positions, lod };
+  // Keep all trees visible, but only nearby trunks in the physics broad phase.
+  // Refresh after 25 m of travel, well before reaching the 110 m activation edge.
+  const active = new Map<number, R.Collider>();
+  let previousX = Infinity,
+    previousZ = Infinity;
+  function updateColliders(position: { x: number; z: number }) {
+    if ((position.x - previousX) ** 2 + (position.z - previousZ) ** 2 < 25 ** 2) return;
+    previousX = position.x;
+    previousZ = position.z;
+    for (const [index, collider] of active) {
+      const p = positions[index];
+      if ((p.x - position.x) ** 2 + (p.z - position.z) ** 2 > 140 ** 2) {
+        world.removeCollider(collider, false);
+        active.delete(index);
+      }
+    }
+    positions.forEach((p, index) => {
+      if (active.has(index) || (p.x - position.x) ** 2 + (p.z - position.z) ** 2 > 110 ** 2) return;
+      active.set(
+        index,
+        world.createCollider(
+          R.ColliderDesc.cylinder(p.h * 0.44, 0.22)
+            .setTranslation(p.x, p.y + p.h * 0.44, p.z)
+            .setFriction(0.7),
+        ),
+      );
+    });
+  }
+  return {
+    count: positions.length,
+    positions,
+    lod,
+    updateColliders,
+    get activeColliderCount() {
+      return active.size;
+    },
+  };
 }

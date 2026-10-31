@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as THREE from 'three';
 import { tileSurface, addForestLOD } from '../src/world/visibility';
-import { createAdaptiveQuality } from '../src/engine/quality';
+import { createAdaptiveQuality, renderRatioLimit } from '../src/engine/quality';
 
 test('los sectores conservan cada triángulo del terreno y sus atributos', () => {
   const scene = new THREE.Scene(),
@@ -91,14 +91,24 @@ test('el bosque conserva instancias cercanas, usa siluetas lejanas y límites de
   assert.equal(count, 3);
 });
 
-test('resolución adaptativa: espera, reduce carga sostenida y respeta límites', () => {
-  const quality = createAdaptiveQuality(1.25);
-  for (let i = 0; i < 300; i++) quality.sample(1 / 25);
-  assert.equal(quality.ratio, 0.7);
+test('resolución adaptativa: limita píxeles, reacciona a 14 FPS y respeta el tamaño de ventana', () => {
+  const cap = renderRatioLimit(1920, 1080, 2),
+    quality = createAdaptiveQuality(cap);
+  assert(1920 * 1080 * quality.ratio ** 2 <= 960 * 600 + 1);
+  for (let i = 0; i < 60; i++) quality.sample(1 / 14);
+  assert(
+    Math.abs(quality.ratio - cap * 0.6) < 0.001,
+    'reduce la carga rápidamente cuando los FPS son muy bajos',
+  );
   for (let i = 0; i < 2000; i++) quality.sample(1 / 90);
-  assert(quality.ratio > 0.7 && quality.ratio <= 1.25);
+  assert(quality.ratio > cap * 0.6 && quality.ratio <= cap);
   quality.reset();
   const ratio = quality.ratio;
   quality.sample(5);
-  assert.equal(quality.ratio, ratio, 'un salto al volver a la pestaña no cambia calidad');
+  assert.equal(quality.ratio, ratio, 'volver de otra pestaña no altera calidad');
+  quality.resize(renderRatioLimit(3840, 2160, 2));
+  assert(
+    3840 * 2160 * quality.ratio ** 2 <= 960 * 600 + 1,
+    'el redimensionado conserva el presupuesto',
+  );
 });

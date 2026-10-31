@@ -145,7 +145,7 @@ export function createVehicleModel(scene, renderer, document) {
       closed,
     );
     return mesh(
-      new THREE.TubeGeometry(curve, Math.max(12, points.length * 8), r, 6, closed),
+      new THREE.TubeGeometry(curve, Math.max(8, points.length * 2), r, 4, closed),
       mat,
       parent,
     );
@@ -199,11 +199,11 @@ export function createVehicleModel(scene, renderer, document) {
     const g = new THREE.ExtrudeGeometry(shape, {
       depth: Math.max(0.005, d - r * 2),
       bevelEnabled: true,
-      bevelSegments: 3,
+      bevelSegments: 1,
       steps: 1,
       bevelSize: r * 0.45,
       bevelThickness: r * 0.45,
-      curveSegments: 6,
+      curveSegments: 3,
     });
     g.center();
     const m = mesh(g, mat, parent);
@@ -310,8 +310,8 @@ export function createVehicleModel(scene, renderer, document) {
   for (const sign of [-1, 1]) {
     const top = [],
       side = [];
-    for (let i = 0; i <= 220; i++) {
-      const x = -4.25 + (i * 8.47) / 220,
+    for (let i = 0; i <= 110; i++) {
+      const x = -4.25 + (i * 8.47) / 110,
         [w, shoulder, center] = profile(x),
         bottom = archBottom(x);
       const a = [],
@@ -667,12 +667,12 @@ export function createVehicleModel(scene, renderer, document) {
         [0.554, 0.235],
         [0.554, -0.235],
       ].map(([r, w]) => new THREE.Vector2(r, w));
-      const tire = mesh(new THREE.LatheGeometry(tireProfile, 96), rubber, roll);
+      const tire = mesh(new THREE.LatheGeometry(tireProfile, 48), rubber, roll);
       tire.rotation.x = Math.PI / 2;
       for (const side of [-1, 1]) {
-        const lip = mesh(new THREE.TorusGeometry(0.557, 0.016, 8, 80), silver, roll);
+        const lip = mesh(new THREE.TorusGeometry(0.557, 0.016, 6, 32), silver, roll);
         lip.position.z = side * 0.242;
-        const bead = mesh(new THREE.TorusGeometry(0.69, 0.004, 4, 80), darkMetal, roll);
+        const bead = mesh(new THREE.TorusGeometry(0.69, 0.004, 4, 32), darkMetal, roll);
         bead.position.z = side * 0.233;
       }
       // Surcos de rodadura instanciados a lo largo de todo el perímetro.
@@ -694,10 +694,10 @@ export function createVehicleModel(scene, renderer, document) {
         }
       roll.add(grooves);
       for (const offset of [-0.058, 0.058]) {
-        const line = mesh(new THREE.TorusGeometry(0.792, 0.006, 4, 96), trim, roll);
+        const line = mesh(new THREE.TorusGeometry(0.792, 0.006, 4, 32), trim, roll);
         line.position.z = offset;
       }
-      const disc = mesh(new THREE.CylinderGeometry(0.475, 0.475, 0.035, 80), brake, roll);
+      const disc = mesh(new THREE.CylinderGeometry(0.475, 0.475, 0.035, 32), brake, roll);
       disc.rotation.x = Math.PI / 2;
       disc.position.z = sign * 0.12;
       const holes = new THREE.InstancedMesh(new THREE.CircleGeometry(0.013, 6), carbon, 56);
@@ -722,7 +722,7 @@ export function createVehicleModel(scene, renderer, document) {
       discHat.rotation.x = Math.PI / 2;
       discHat.position.z = sign * 0.155;
       const barrel = mesh(
-        new THREE.CylinderGeometry(0.551, 0.551, 0.35, 64, 1, true),
+        new THREE.CylinderGeometry(0.551, 0.551, 0.35, 32, 1, true),
         darkMetal,
         roll,
       );

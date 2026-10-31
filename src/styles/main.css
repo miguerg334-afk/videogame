@@ -62,7 +62,7 @@ header {
 .controls button {
   border: 1px solid #ffffff35;
   background: #152321bf;
-  backdrop-filter: blur(10px);
+  backdrop-filter: none;
   border-radius: 9px;
   padding: 10px 13px;
   font-size: 11px;
@@ -759,7 +759,7 @@ body.is-menu .notice {
   flex-shrink: 0;
   border: 1px solid #ffffff35;
   background: #152321bf;
-  backdrop-filter: blur(10px);
+  backdrop-filter: none;
   border-radius: 9px;
   padding: 0 10px;
 }

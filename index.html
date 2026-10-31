@@ -35,7 +35,8 @@
             <kbd>↑ ↓</kbd> Acelerar / frenar · <kbd>← →</kbd> Girar<br />
             <kbd>Espacio</kbd> Freno de mano · <kbd>C</kbd> Cambiar cámara<br />
             <kbd>1—4</kbd> Elegir cámara · Mantén <kbd>B</kbd> para mirar atrás<br />
-            <kbd>P</kbd> Pausa · <kbd>R</kbd> Reiniciar · <kbd>L</kbd> Luces
+            <kbd>F</kbd> Enderezar aquí · <kbd>P</kbd> Pausa · <kbd>R</kbd> Reiniciar ·
+            <kbd>L</kbd> Luces
           </p>
           <p>
             Tu máximo y el de la patrulla suben juntos de 100 a 120 km/h. La intensidad policial
@@ -51,10 +52,6 @@
     </header>
     <div class="controls">
       <button id="home" aria-label="Volver al menú de inicio">Menú</button>
-      <button id="trails" title="Explorar los atajos de tierra">V · Atajos</button>
-      <button id="summit" title="Ir al comienzo de la subida al Puerto del Alba">
-        M · Montaña
-      </button>
       <button id="lights" aria-pressed="true" aria-label="Encender o apagar las luces">
         L · Luces
       </button>
@@ -71,7 +68,10 @@
           <option value="3">Retrovisor</option>
         </select>
       </label>
-      <button id="reset">R · Volver</button
+      <button id="recover" title="Enderezar aquí, sin reiniciar la persecución">
+        F · Enderezar
+      </button>
+      <button id="reset" title="Reiniciar la persecución desde intensidad 1">R · Reiniciar</button
       ><button id="pause" aria-pressed="false">P · Pausa</button>
     </div>
     <div class="pursuit-hud" aria-label="Estado de la persecución">
