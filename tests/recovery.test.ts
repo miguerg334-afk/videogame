@@ -83,6 +83,7 @@ test('enderezar dentro y encima del túnel usa la superficie real sin reiniciar 
       for (let tick = 0; tick < 180; tick++) {
         police.step(1 / 120, sim.body.translation(), true);
         sim.step(neutral, 1 / 120);
+        police.afterStep();
       }
       sim.body.setRotation({ x: 1, y: 0, z: 0, w: 0 }, true);
       map.world.step();

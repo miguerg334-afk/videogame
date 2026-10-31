@@ -816,3 +816,25 @@ body.is-menu .notice {
   color: #a8c8e6;
   letter-spacing: 0.25px;
 }
+
+/* Capture stays in the existing corner HUD, leaving the cars unobstructed. */
+.capture-warning {
+  margin-top: 10px;
+}
+.capture-warning small {
+  color: #ffb6a2;
+}
+.capture-bar {
+  height: 5px;
+  margin-top: 5px;
+  background: #ffffff18;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.capture-bar i {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #ffbc62, #ff3859);
+  transition: width 0.1s linear;
+}

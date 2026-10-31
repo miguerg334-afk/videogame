@@ -6,7 +6,7 @@ import { createPursuit } from '../src/police/pursuit';
 await R.init();
 
 test('menú, pausa y derrota bloquean el reloj y el movimiento; jugar y reiniciar habilitan la ronda', () => {
-  const world = new R.World({ x: 0, y: 0, z: 0 }),
+  const world = new R.World({ x: 0, y: -9.81, z: 0 }),
     police = createPursuit(world),
     session = createGameSession(),
     dt = 1 / 120;
@@ -14,12 +14,14 @@ test('menú, pausa y derrota bloquean el reloj y el movimiento; jugar y reinicia
     { x: -55, y: 0.65, z: 0 },
     { x: 0, y: 0.65, z: 0 },
   ];
+  world.createCollider(R.ColliderDesc.cuboid(500, 0.1, 50).setTranslation(0, -0.1, 0));
   police.reset(seed);
   const advance = () => {
     if (session.running) {
       police.step(dt, seed[1], true);
       world.timestep = dt;
       world.step();
+      police.afterStep();
     }
   };
   try {

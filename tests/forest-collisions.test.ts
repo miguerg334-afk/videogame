@@ -48,6 +48,12 @@ test('conserva todos los árboles y activa sus choques antes de que el coche pue
     forest.updateColliders(first);
     map.world.step();
     assert(trunk(first), 'volver restaura el choque');
+    forest.updateColliders(first, far);
+    map.world.step();
+    assert(trunk(first) && trunk(far), 'los dos coches tienen colisiones en zonas separadas');
+    forest.updateColliders(far);
+    map.world.step();
+    assert(!trunk(first) && trunk(far), 'descarga la región que ya no necesita ningún coche');
     assert.equal(forest.positions.length, 1800, 'no se elimina vegetación visual');
   } finally {
     map.world.free();

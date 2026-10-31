@@ -172,21 +172,26 @@ export function createForest(
   // Keep all trees visible, but only nearby trunks in the physics broad phase.
   // Refresh after 25 m of travel, well before reaching the 110 m activation edge.
   const active = new Map<number, R.Collider>();
-  let previousX = Infinity,
-    previousZ = Infinity;
-  function updateColliders(position: { x: number; z: number }) {
-    if ((position.x - previousX) ** 2 + (position.z - previousZ) ** 2 < 25 ** 2) return;
-    previousX = position.x;
-    previousZ = position.z;
+  let previous: { x: number; z: number }[] = [];
+  function updateColliders(position: { x: number; z: number }, pursuer?: { x: number; z: number }) {
+    const centers = pursuer ? [position, pursuer] : [position];
+    if (
+      previous.length === centers.length &&
+      centers.every((p, i) => (p.x - previous[i].x) ** 2 + (p.z - previous[i].z) ** 2 < 25 ** 2)
+    )
+      return;
+    previous = centers.map((p) => ({ x: p.x, z: p.z }));
+    const within = (p: { x: number; z: number }, radius: number) =>
+      centers.some((center) => (p.x - center.x) ** 2 + (p.z - center.z) ** 2 <= radius ** 2);
     for (const [index, collider] of active) {
       const p = positions[index];
-      if ((p.x - position.x) ** 2 + (p.z - position.z) ** 2 > 140 ** 2) {
+      if (!within(p, 140)) {
         world.removeCollider(collider, false);
         active.delete(index);
       }
     }
     positions.forEach((p, index) => {
-      if (active.has(index) || (p.x - position.x) ** 2 + (p.z - position.z) ** 2 > 110 ** 2) return;
+      if (active.has(index) || !within(p, 110)) return;
       active.set(
         index,
         world.createCollider(

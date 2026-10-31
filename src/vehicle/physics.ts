@@ -3,10 +3,10 @@ import { recoveryPose } from './recovery';
 import { rotateVector } from '../engine/math';
 import type { DrivingInput, DrivingState, VectorLike } from '../engine/types';
 
-import { START_SPEED_KMH, pursuitSpeedLimitKmh } from '../engine/speed';
+import { pursuitSpeedLimitKmh } from '../engine/speed';
 export { MAX_SPEED_KMH } from '../engine/speed';
 
-export function createDrivingPhysics(world: R.World) {
+export function createDrivingPhysics(world: R.World, speedCeiling = pursuitSpeedLimitKmh) {
   // CCD may need more than one impact in a step at tunnel walls or rough ground.
   world.integrationParameters.maxCcdSubsteps = 4;
   const body = world.createRigidBody(
@@ -56,9 +56,8 @@ export function createDrivingPhysics(world: R.World) {
     reverse = false,
     speed = 0,
     braking = false,
-    speedLimitKmh = START_SPEED_KMH;
-  function step(input: DrivingInput, dt: number, offroad = false): DrivingState {
-    const maxSpeed = speedLimitKmh / 3.6;
+    speedLimitKmh = speedCeiling(0);
+  function prepare(input: DrivingInput, dt: number, offroad = false) {
     const velocity = body.linvel(),
       q = body.rotation(),
       forward = rotateVector(q, { x: 1, y: 0, z: 0 });
@@ -75,7 +74,7 @@ export function createDrivingPhysics(world: R.World) {
     braking = false;
     if (input.up) {
       if (speed < -0.7) braking = true;
-      else drive = 1;
+      else drive = Math.max(0, Math.min(1, input.throttleAxis ?? 1));
     } else if (input.down) {
       if (!reverse && speed > 0.45) braking = true;
       else {
@@ -84,7 +83,11 @@ export function createDrivingPhysics(world: R.World) {
       }
     }
     const desiredSteer =
-      ((input.left ? 1 : 0) - (input.right ? 1 : 0)) * (0.51 / (1 + Math.abs(speed) * 0.035));
+      Math.max(
+        -1,
+        Math.min(1, input.steeringAxis ?? (input.left ? 1 : 0) - (input.right ? 1 : 0)),
+      ) *
+      (0.51 / (1 + Math.abs(speed) * 0.035));
     steering += (desiredSteer - steering) * Math.min(1, dt * (drive ? 5 : 7));
     throttle += (drive - throttle) * Math.min(1, dt * 3.8);
     const powerDrop = reverse
@@ -116,12 +119,14 @@ export function createDrivingPhysics(world: R.World) {
         true,
       );
     }
+    braking ||= input.handbrake;
     vehicle.updateVehicle(
       dt,
       R.QueryFilterFlags.EXCLUDE_DYNAMIC | R.QueryFilterFlags.EXCLUDE_SENSORS,
     );
-    world.timestep = dt;
-    world.step();
+  }
+  function finish(): DrivingState {
+    const maxSpeed = speedLimitKmh / 3.6;
     body.resetForces(true);
     // Govern the actual planar velocity, including downhill acceleration and impacts.
     // Vertical motion remains physical so jumps, suspension and falls still behave normally.
@@ -145,9 +150,16 @@ export function createDrivingPhysics(world: R.World) {
       steering,
       throttle,
       reverse,
-      braking: braking || input.handbrake,
+      braking,
       contacts: wheels.map((_, i) => vehicle.wheelIsInContact(i)).filter(Boolean).length,
     };
+  }
+  /** Convenience for single-car simulations. Multiple cars prepare, step the world once, then finish. */
+  function step(input: DrivingInput, dt: number, offroad = false): DrivingState {
+    prepare(input, dt, offroad);
+    world.timestep = dt;
+    world.step();
+    return finish();
   }
   function reset(position: VectorLike, yaw: number, grade = 0) {
     const tilt = Math.atan(grade) / 2;
@@ -165,7 +177,7 @@ export function createDrivingPhysics(world: R.World) {
     body.resetTorques(true);
     steering = throttle = speed = 0;
     reverse = false;
-    speedLimitKmh = START_SPEED_KMH;
+    speedLimitKmh = speedCeiling(0);
   }
   function dispose() {
     world.removeVehicleController(vehicle);
@@ -175,6 +187,8 @@ export function createDrivingPhysics(world: R.World) {
     vehicle,
     wheels,
     step,
+    prepare,
+    finish,
     reset,
     dispose,
     recover(fallbackHeight: (x: number, z: number) => number) {
@@ -189,7 +203,7 @@ export function createDrivingPhysics(world: R.World) {
       reverse = braking = false;
     },
     setPursuitTime(seconds: number) {
-      speedLimitKmh = pursuitSpeedLimitKmh(seconds);
+      speedLimitKmh = speedCeiling(seconds);
     },
     get speedLimitKmh() {
       return speedLimitKmh;

@@ -15,7 +15,8 @@ import { createContactShadow } from '../vehicle/contact-shadow';
 import { freezeWorldTransforms } from '../engine/transforms';
 import { createPoliceModel } from '../police/model';
 import { createPursuit } from '../police/pursuit';
-import { createGameSession } from './session';
+import { createPursuitNavigation } from '../police/navigation';
+import { CAPTURE_SECONDS, createGameSession } from './session';
 import { renderRatioLimit } from '../engine/quality';
 import { DRIVING_CAMERAS, frameDrivingCamera, policeBearing } from '../engine/driving-cameras';
 
@@ -47,13 +48,17 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
   const { body, vehicle } = sim;
   const policeModel = createPoliceModel(model, document);
   scene.add(policeModel.rig);
-  const police = createPursuit(mountain.world);
+  const police = createPursuit(
+    mountain.world,
+    driveGroundHeight,
+    createPursuitNavigation(mountain),
+  );
   const session = createGameSession();
   document.body.classList.add('is-menu');
   element('startMenu').hidden = false;
   const exhaustFlames = createExhaustFlames(model.car);
   const carShadow = createContactShadow(rig);
-  createContactShadow(policeModel.rig);
+  const policeShadow = createContactShadow(policeModel.rig);
   const lifecycle = createLifecycle();
   const { listen, listenDocument, listenElement } = lifecycle;
   lifecycle.onDispose(() => police.dispose());
@@ -378,11 +383,16 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       ? `POLICÍA A ${Math.round(policeDistance)} M · ${Math.floor(police.elapsed)} S`
       : 'ARRANCA PARA COMENZAR';
     element('pursuit-meter').style.width = `${8 + difficulty.intensity * 92}%`;
+    element('capture-warning').hidden = session.captureSeconds === 0;
+    element('capture-label').textContent =
+      `ESCAPA · ${(CAPTURE_SECONDS - session.captureSeconds).toFixed(1)} S`;
+    element('capture-meter').style.width = `${session.captureProgress * 100}%`;
+    element('capture-bar').setAttribute('aria-valuenow', session.captureSeconds.toFixed(1));
     const velocity = body.linvel(),
       speed = Math.hypot(velocity.x, velocity.z) * 3.6;
     speedEl.textContent = String(Math.round(speed));
     element('speed-limit').textContent =
-      `LÍMITE COMPARTIDO · ${Math.round(sim.speedLimitKmh)} KM/H`;
+      `TÚ ${Math.round(sim.speedLimitKmh)} · POLICÍA ${Math.round(police.difficulty.maxSpeed * 3.6)} KM/H`;
     gearEl.textContent = lastState.reverse
       ? 'R · REVERSA'
       : speed < 0.5 && !input.up
@@ -429,6 +439,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       steer: +lastState.steering.toFixed(3),
       speedLimit: sim.speedLimitKmh,
       caught: session.caught,
+      captureSeconds: +session.captureSeconds.toFixed(2),
       pursuitSeconds: +police.elapsed.toFixed(2),
       policeLevel: difficulty.level,
       policeDistance: +policeDistance.toFixed(2),
@@ -451,14 +462,24 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     drawMap(body.translation(), body.rotation(), police.body.translation(), simTime);
   }
   function physicsTick(dt: number) {
-    mountain.forest.updateColliders(body.translation());
+    mountain.forest.updateColliders(body.translation(), police.body.translation());
     nearest = nearestTrack(body.translation());
-    police.step(dt, body.translation(), input.up || input.down || Math.abs(lastState.speed) > 0.5);
+    police.step(
+      dt,
+      body.translation(),
+      input.up || input.down || Math.abs(lastState.speed) > 0.5,
+      nearestTrack(police.body.translation()).distance > 4.2,
+    );
     sim.setPursuitTime(police.elapsed);
-    lastState = sim.step(input, dt, nearest.distance > 4.2);
+    sim.prepare(input, dt, nearest.distance > 4.2);
+    mountain.world.timestep = dt;
+    mountain.world.step();
+    lastState = sim.finish();
+    police.afterStep();
     mountain.boundary.enforce(body);
+    mountain.boundary.enforce(police.body);
     simTime += dt;
-    if (police.touches(body)) {
+    if (session.updateCapture(police.touches(body), dt)) {
       losePursuit();
       return;
     }
@@ -537,6 +558,13 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       policeRotation.w,
     );
     policeModel.update(previewTime, police.speed, dt);
+    policeShadow.visible = police.state.contacts > 1;
+    for (let i = 0; i < 4; i++) {
+      policeModel.wheels[i].pivot.position.y =
+        (0.66 - (police.vehicle.wheelSuspensionLength(i) ?? 0.32)) / 0.52;
+      policeModel.wheels[i].pivot.rotation.y = police.vehicle.wheelSteering(i) ?? 0;
+      policeModel.wheels[i].roll.rotation.z = -(police.vehicle.wheelRotation(i) ?? 0);
+    }
     for (let i = 0; i < 4; i++) {
       const length = vehicle.wheelSuspensionLength(i) ?? 0.32;
       wheelAssemblies[i].pivot.position.y = (0.48 + 0.18 - length) / 0.52;
@@ -650,7 +678,16 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
   );
   resetCar(true);
   mountain.forest.updateColliders(body.translation());
-  for (let i = 0; i < 90; i++) sim.step(input, 1 / 120);
+  for (let i = 0; i < 90; i++) {
+    police.step(
+      1 / 120,
+      body.translation(),
+      false,
+      nearestTrack(police.body.translation()).distance > 4.2,
+    );
+    sim.step(input, 1 / 120);
+    police.afterStep();
+  }
   // Warm up materials, including off-screen scenery and exhaust, while loading.
   renderer.compile(scene, camera);
   draw(0);

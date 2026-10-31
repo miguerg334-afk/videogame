@@ -6,10 +6,13 @@ export interface DrivingInput {
   left: boolean;
   right: boolean;
   handbrake: boolean;
+  /** Analog controls for AI; bounded by the same steering and engine limits. */
+  steeringAxis?: number;
+  throttleAxis?: number;
   boost?: boolean;
   walk?: boolean;
 }
-export type InputAction = keyof DrivingInput;
+export type InputAction = Exclude<keyof DrivingInput, 'steeringAxis' | 'throttleAxis'>;
 export interface VectorLike {
   x: number;
   y: number;

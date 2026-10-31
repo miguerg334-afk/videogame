@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 import R from '@dimforge/rapier3d-compat/rapier.es.js';
-import type { VectorLike } from '../engine/types';
-import { pursuitSpeedLimitKmh } from '../engine/speed';
+import type { DrivingInput, VectorLike } from '../engine/types';
+import { rotateVector } from '../engine/math';
+import { policeSpeedLimitKmh } from '../engine/speed';
+import type { PursuitNavigation } from './navigation';
+import { createDrivingPhysics } from '../vehicle/physics';
 
 export function pursuitDifficulty(seconds: number) {
   seconds = Math.max(0, seconds);
@@ -9,127 +12,246 @@ export function pursuitDifficulty(seconds: number) {
   return {
     intensity,
     level: 1 + Math.min(4, Math.floor(seconds / 30)),
-    maxSpeed: pursuitSpeedLimitKmh(seconds) / 3.6,
-    acceleration: 2 + intensity,
+    maxSpeed: policeSpeedLimitKmh(seconds) / 3.6,
   };
 }
 
-/** Follow the player's driven path, including mountains and tunnels, without pathfinding scans. */
-export function createPursuit(world: R.World) {
-  const body = world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased());
-  // Sensors give exact chassis contact without pushing or launching the player.
-  const colliders = [
-    world.createCollider(
-      R.ColliderDesc.cuboid(1.98, 0.25, 0.82).setTranslation(0, 0.06, 0).setSensor(true),
-      body,
-    ),
-    world.createCollider(
-      R.ColliderDesc.cuboid(0.79, 0.17, 0.57).setTranslation(-0.1, 0.51, 0).setSensor(true),
-      body,
-    ),
-  ];
-  const position = new THREE.Vector3(),
-    lastSample = new THREE.Vector3(),
-    direction = new THREE.Vector3(1, 0, 0);
-  const tiltAxis = new THREE.Vector3(0, 0, 1);
-  const orientation = new THREE.Quaternion(),
-    up = new THREE.Vector3(0, 1, 0),
-    yawRotation = new THREE.Quaternion(),
-    tiltRotation = new THREE.Quaternion();
+/** The route is a steering guide, never a prescribed position or velocity. */
+export function createPursuit(
+  world: R.World,
+  groundHeight: (x: number, z: number) => number = () => 0,
+  navigation?: PursuitNavigation,
+) {
+  const sim = createDrivingPhysics(world, policeSpeedLimitKmh);
+  const { body, vehicle } = sim;
+  const lastTarget = new THREE.Vector3(),
+    plannedTarget = new THREE.Vector3(Infinity, 0, 0);
+  const targetVelocity = new THREE.Vector3(),
+    measuredVelocity = new THREE.Vector3(),
+    intercept = new THREE.Vector3();
+  let replanIn = 0,
+    targetKnown = false;
+  const point = new THREE.Vector3(),
+    projection = new THREE.Vector3();
+  const segment = new THREE.Vector3(),
+    closest = new THREE.Vector3();
+  const aim = new THREE.Vector3(),
+    farAim = new THREE.Vector3();
+  const controls: DrivingInput = {
+    up: false,
+    down: false,
+    left: false,
+    right: false,
+    handbrake: false,
+  };
   let path: THREE.Vector3[] = [],
     head = 0,
     elapsed = 0,
-    speed = 0,
-    started = false,
-    yaw = 0;
+    started = false;
+  let stalled = 0,
+    reversing = 0,
+    overturnedFor = 0;
+  let state = { speed: 0, steering: 0, throttle: 0, contacts: 0, reverse: false, braking: false };
+
   function reset(seed: VectorLike[]) {
     if (seed.length < 2) throw new Error('La persecución necesita una ruta inicial');
     path = seed.map((p) => new THREE.Vector3(p.x, p.y, p.z));
-    position.copy(path[0]);
-    lastSample.copy(path[path.length - 1]);
-    head = 1;
-    elapsed = speed = 0;
+    lastTarget.copy(path[path.length - 1]);
+    targetVelocity.set(0, 0, 0);
+    targetKnown = false;
+    replanIn = 0;
+    head = 0;
+    elapsed = stalled = reversing = overturnedFor = 0;
     started = false;
-    direction.copy(path[1]).sub(position).normalize();
-    yaw = -Math.atan2(direction.z, direction.x);
-    yawRotation.setFromAxisAngle(up, yaw);
-    tiltRotation.setFromAxisAngle(
-      tiltAxis,
-      Math.atan2(direction.y, Math.hypot(direction.x, direction.z)),
+    const direction = path[1].clone().sub(path[0]);
+    sim.reset(
+      path[0],
+      -Math.atan2(direction.z, direction.x),
+      direction.y / Math.max(0.01, Math.hypot(direction.x, direction.z)),
     );
-    orientation.copy(yawRotation).multiply(tiltRotation);
-    body.setTranslation(position, true);
-    body.setNextKinematicTranslation(position);
-    body.setRotation(orientation, true);
-    body.setNextKinematicRotation(orientation);
-    body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-    body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    state = { speed: 0, steering: 0, throttle: 0, contacts: 0, reverse: false, braking: false };
   }
-  function step(dt: number, target: VectorLike, driving: boolean) {
-    if (!path.length) return;
-    if (
-      (lastSample.x - target.x) ** 2 +
-        (lastSample.y - target.y) ** 2 +
-        (lastSample.z - target.z) ** 2 >=
-      1.5 ** 2
-    ) {
-      lastSample.set(target.x, target.y, target.z);
-      path.push(lastSample.clone());
+
+  function ahead(distance: number, result: THREE.Vector3) {
+    result.copy(closest);
+    for (let i = head + 1; i < path.length; i++) {
+      const length = result.distanceTo(path[i]);
+      if (length >= distance) return result.lerp(path[i], distance / Math.max(0.001, length));
+      distance -= length;
+      result.copy(path[i]);
     }
-    started ||= driving;
-    if (!started) return;
-    elapsed += dt;
-    const difficulty = pursuitDifficulty(elapsed);
-    const desiredSpeed = elapsed < 3 || head >= path.length ? 0 : difficulty.maxSpeed;
-    speed += THREE.MathUtils.clamp(desiredSpeed - speed, -6 * dt, difficulty.acceleration * dt);
-    let distance = speed * dt;
-    while (distance > 0 && head < path.length) {
-      direction.copy(path[head]).sub(position);
-      const remaining = direction.length();
-      if (remaining < 0.001) {
-        head++;
-        continue;
-      }
-      direction.multiplyScalar(1 / remaining);
-      const travel = Math.min(distance, remaining);
-      position.addScaledVector(direction, travel);
-      distance -= travel;
-      if (travel >= remaining) head++;
-    }
-    if (head > 512) {
-      path.splice(0, head - 1);
-      head = 1;
-    }
-    if (speed > 0.05) {
-      const wanted = -Math.atan2(direction.z, direction.x);
-      const delta = Math.atan2(Math.sin(wanted - yaw), Math.cos(wanted - yaw));
-      yaw += delta * Math.min(1, dt * 9);
-      yawRotation.setFromAxisAngle(up, yaw);
-      tiltRotation.setFromAxisAngle(
-        tiltAxis,
-        Math.atan2(direction.y, Math.hypot(direction.x, direction.z)),
+    return result;
+  }
+
+  function recoverIfOverturned(dt: number) {
+    const up = rotateVector(body.rotation(), { x: 0, y: 1, z: 0 });
+    const velocity = body.linvel(),
+      spin = body.angvel();
+    let settled =
+      started &&
+      elapsed >= 3 &&
+      up.y < 0.35 &&
+      Math.hypot(velocity.x, velocity.y, velocity.z) < 2 &&
+      Math.hypot(spin.x, spin.y, spin.z) < 1.5;
+    if (settled) {
+      const p = body.translation();
+      const hit = world.castRayAndGetNormal(
+        new R.Ray({ x: p.x, y: p.y + 0.15, z: p.z }, { x: 0, y: -1, z: 0 }),
+        2,
+        false,
+        R.QueryFilterFlags.EXCLUDE_DYNAMIC | R.QueryFilterFlags.EXCLUDE_SENSORS,
       );
-      orientation.copy(yawRotation).multiply(tiltRotation);
+      settled = !!hit && hit.normal.y > 0.35;
     }
-    body.setNextKinematicTranslation(position);
-    body.setNextKinematicRotation(orientation);
+    overturnedFor = settled ? overturnedFor + dt : 0;
+    if (overturnedFor >= 2.5) {
+      // The same recovery as F: preserve X/Z, heading, route, clock and speed limit.
+      sim.recover(groundHeight);
+      overturnedFor = stalled = reversing = 0;
+      state = { speed: 0, steering: 0, throttle: 0, contacts: 0, reverse: false, braking: false };
+    }
+  }
+
+  /** Prepare wheel forces. The caller integrates both cars in ONE shared world step. */
+  function step(dt: number, target: VectorLike, driving: boolean, offroad = false) {
+    if (!path.length) return;
+    started ||= driving;
+    if (started) elapsed += dt;
+    sim.setPursuitTime(elapsed);
+    recoverIfOverturned(dt);
+    const p = body.translation(),
+      velocity = body.linvel();
+    if (targetKnown) {
+      const dx = target.x - lastTarget.x,
+        dz = target.z - lastTarget.z;
+      if (Math.hypot(dx, dz) < 2)
+        targetVelocity.lerp(measuredVelocity.set(dx / dt, 0, dz / dt), Math.min(1, dt * 5));
+      else targetVelocity.set(0, 0, 0);
+      targetVelocity.clampLength(0, 40);
+    }
+    targetKnown = true;
+    lastTarget.set(target.x, target.y, target.z);
+    const gap = Math.hypot(target.x - p.x, target.z - p.z);
+    const lead = Math.min(0.9, gap / 50);
+    intercept.set(target.x + targetVelocity.x * lead, target.y, target.z + targetVelocity.z * lead);
+    replanIn -= dt;
+    if (started && (replanIn <= 0 || plannedTarget.distanceToSquared(intercept) > 12 ** 2)) {
+      intercept.y =
+        target.y + groundHeight(intercept.x, intercept.z) - groundHeight(target.x, target.z);
+      if (navigation && !navigation.clearSegment(target, intercept))
+        intercept.set(target.x, target.y, target.z);
+      const route = navigation?.plan(p, intercept) ?? [p, intercept];
+      path = route.map((v) => new THREE.Vector3(v.x, v.y, v.z));
+      head = 0;
+      plannedTarget.copy(intercept);
+      replanIn = 0.75;
+    } else if (started && path.length) path[path.length - 1].copy(intercept);
+    point.set(p.x, p.y, p.z);
+    const speed = Math.hypot(velocity.x, velocity.z);
+    // Local projection preserves route order at intersections and on stacked tunnel roads.
+    let best = Infinity,
+      bestHead = head;
+    const end = Math.min(path.length - 1, head + 40);
+    for (let i = head; i < end; i++) {
+      segment.copy(path[i + 1]).sub(path[i]);
+      const t = THREE.MathUtils.clamp(
+        projection.copy(point).sub(path[i]).dot(segment) / Math.max(0.001, segment.lengthSq()),
+        0,
+        1,
+      );
+      projection.copy(path[i]).addScaledVector(segment, t);
+      const distance = point.distanceToSquared(projection);
+      if (distance < best) {
+        best = distance;
+        bestHead = i;
+        closest.copy(projection);
+      }
+    }
+    head = bestHead;
+    ahead(5 + speed * 0.55, aim);
+    ahead(12 + speed * 1.3, farAim);
+    const forward = rotateVector(body.rotation(), { x: 1, y: 0, z: 0 });
+    const yaw = Math.atan2(-forward.z, forward.x);
+    const angleTo = (v: THREE.Vector3) => {
+      const angle = Math.atan2(-(v.z - p.z), v.x - p.x) - yaw;
+      return Math.atan2(Math.sin(angle), Math.cos(angle));
+    };
+    const angle = angleTo(aim);
+    const lookDistance = Math.max(2, Math.hypot(aim.x - p.x, aim.z - p.z));
+    const curvature =
+      (2 * Math.sin(THREE.MathUtils.clamp(angle, -Math.PI / 2, Math.PI / 2))) / lookDistance;
+    const turnAhead =
+      (2 * Math.abs(Math.sin(angleTo(farAim)))) /
+      Math.max(3, Math.hypot(farAim.x - p.x, farAim.z - p.z));
+    const difficulty = pursuitDifficulty(elapsed);
+    // Brakes and lateral grip limit cornering; higher intensity only changes driver inputs.
+    const cornerSpeed = Math.sqrt(
+      (5 + difficulty.intensity * 2) / Math.max(0.001, Math.abs(curvature), turnAhead),
+    );
+    const remaining = Math.hypot(aim.x - p.x, aim.z - p.z);
+    let routeRemaining = closest.distanceTo(path[head + 1]);
+    for (let i = head + 1; i < path.length - 1 && routeRemaining < 200; i++)
+      routeRemaining += path[i].distanceTo(path[i + 1]);
+    const desiredSpeed = Math.min(
+      difficulty.maxSpeed,
+      cornerSpeed,
+      targetVelocity.length() + Math.sqrt(8 * Math.max(3, routeRemaining)),
+    );
+    const active = started && elapsed >= 3;
+    if (active && speed < 0.65 && remaining > 5 && state.contacts >= 2) stalled += dt;
+    else stalled = 0;
+    if (stalled > 3) {
+      reversing = 1.2;
+      stalled = 0;
+    }
+    reversing = Math.max(0, reversing - dt);
+    controls.steeringAxis = THREE.MathUtils.clamp(
+      Math.atan(2.756 * curvature) / (0.51 / (1 + speed * 0.035)),
+      -1,
+      1,
+    );
+    controls.throttleAxis = 0.72 + difficulty.intensity * 0.28;
+    const tipped = rotateVector(body.rotation(), { x: 0, y: 1, z: 0 }).y < 0.35;
+    controls.up = active && !tipped && reversing === 0 && speed < desiredSpeed;
+    controls.down = active && !tipped && (reversing > 0 || speed > desiredSpeed + 0.8);
+    if (reversing > 0) controls.steeringAxis *= -1;
+    // Hold on slopes during the initial grace period with the ordinary wheel brakes.
+    controls.handbrake = !active || tipped;
+    sim.prepare(controls, dt, offroad);
+    if (head > 512) {
+      path.splice(0, head);
+      head = 0;
+    }
+  }
+  function afterStep() {
+    state = sim.finish();
   }
   function touches(player: R.RigidBody) {
-    for (const collider of colliders)
-      for (let i = 0; i < player.numColliders(); i++)
-        if (world.intersectionPair(collider, player.collider(i))) return true;
-    return false;
+    let touched = false;
+    for (let a = 0; a < body.numColliders(); a++)
+      for (let b = 0; b < player.numColliders(); b++)
+        world.contactPair(body.collider(a), player.collider(b), (manifold) => {
+          for (let i = 0; i < manifold.numContacts(); i++)
+            if (manifold.contactDist(i) <= 0.01) touched = true;
+        });
+    return touched;
   }
   return {
     body,
+    vehicle,
     reset,
     step,
+    afterStep,
     touches,
     get elapsed() {
       return elapsed;
     },
     get speed() {
-      return speed;
+      const v = body.linvel();
+      return Math.hypot(v.x, v.z);
+    },
+    get state() {
+      return state;
     },
     get started() {
       return started;
@@ -138,6 +260,7 @@ export function createPursuit(world: R.World) {
       return pursuitDifficulty(elapsed);
     },
     dispose() {
+      sim.dispose();
       world.removeRigidBody(body);
     },
   };
