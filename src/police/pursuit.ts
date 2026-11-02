@@ -7,6 +7,7 @@ import {
   PURSUIT_LEVEL_SECONDS,
   PURSUIT_RAMP_SECONDS,
   REINFORCEMENT_SECONDS,
+  HELICOPTER_SECONDS,
 } from '../engine/speed';
 import type { PursuitNavigation } from './navigation';
 import { createDrivingPhysics } from '../vehicle/physics';
@@ -18,10 +19,12 @@ export function pursuitDifficulty(seconds: number) {
     intensity,
     maximumAlert: seconds >= PURSUIT_RAMP_SECONDS,
     level:
-      seconds >= REINFORCEMENT_SECONDS
-        ? 6
-        : 1 + Math.min(4, Math.floor(seconds / PURSUIT_LEVEL_SECONDS)),
-    levelCount: seconds >= REINFORCEMENT_SECONDS ? 6 : 5,
+      seconds >= HELICOPTER_SECONDS
+        ? 7
+        : seconds >= REINFORCEMENT_SECONDS
+          ? 6
+          : 1 + Math.min(4, Math.floor(seconds / PURSUIT_LEVEL_SECONDS)),
+    levelCount: seconds >= HELICOPTER_SECONDS ? 7 : seconds >= REINFORCEMENT_SECONDS ? 6 : 5,
     maxSpeed: policeSpeedLimitKmh(seconds) / 3.6,
   };
 }

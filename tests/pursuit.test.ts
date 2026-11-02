@@ -8,13 +8,13 @@ await R.init();
 const dt = 1 / 120;
 const neutral = { up: false, down: false, left: false, right: false, handbrake: false };
 
-test('la presión empieza baja, aumenta gradualmente y culmina con refuerzos en la sexta intensidad', () => {
+test('la presión empieza baja, aumenta gradualmente y culmina con refuerzos en la séptima intensidad', () => {
   let previous = 0;
   for (let seconds = 0; seconds <= 600; seconds++) {
     const d = pursuitDifficulty(seconds);
     assert(d.maxSpeed >= previous);
     previous = d.maxSpeed;
-    assert(d.level >= 1 && d.level <= 6);
+    assert(d.level >= 1 && d.level <= 7);
     assert(d.intensity >= 0 && d.intensity <= 1);
   }
   assert.equal(pursuitDifficulty(0).maxSpeed * 3.6, 106);

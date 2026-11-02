@@ -175,5 +175,23 @@ export function createTerrain(
       R.TriMeshFlags.FIX_INTERNAL_EDGES,
     ).setFriction(0.6),
   );
-  return { mesh, columns, rows, tiles, lod };
+  /** Exact height of the displayed/physical grid triangle, without a physics raycast. */
+  function sampleSurfaceHeight(x: number, z: number) {
+    const gx = Math.max(0, Math.min(columns, ((x + 1600) / width) * columns));
+    const gz = Math.max(0, Math.min(rows, ((z + 2000) / depth) * rows));
+    const i = Math.min(columns - 1, Math.floor(gx)),
+      j = Math.min(rows - 1, Math.floor(gz));
+    const u = gx - i,
+      v = gz - j;
+    const a = (i * (rows + 1) + j) * 3 + 1,
+      b = a + (rows + 1) * 3,
+      c = a + 3,
+      d = b + 3;
+    return u + v <= 1
+      ? positions[a] + u * (positions[b] - positions[a]) + v * (positions[c] - positions[a])
+      : positions[d] +
+          (1 - u) * (positions[c] - positions[d]) +
+          (1 - v) * (positions[b] - positions[d]);
+  }
+  return { mesh, columns, rows, tiles, lod, sampleSurfaceHeight };
 }

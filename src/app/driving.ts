@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import R from '@dimforge/rapier3d-compat/rapier.es.js';
 import { gsap } from 'gsap';
 import { rotateVector } from '../engine/math';
 import type { DrivingInput, DrivingState, InputAction } from '../engine/types';
@@ -16,6 +17,8 @@ import { freezeWorldTransforms } from '../engine/transforms';
 import { createPoliceModel } from '../police/model';
 import { createPursuit } from '../police/pursuit';
 import { createReinforcements } from '../police/reinforcements';
+import { createAirPursuit, AIR_CAPTURE_SECONDS } from '../police/air-pursuit';
+import { createAirVisual } from '../police/air-visual';
 import { createPursuitNavigation } from '../police/navigation';
 import { CAPTURE_SECONDS, createGameSession } from './session';
 import { renderRatioLimit } from '../engine/quality';
@@ -90,6 +93,25 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       ? police
       : backup;
   }
+  const air = createAirPursuit(driveGroundHeight, (origin, target) => {
+    const dx = target.x - origin.x,
+      dy = target.y + 0.4 - origin.y,
+      dz = target.z - origin.z;
+    const length = Math.hypot(dx, dy, dz);
+    if (length < 0.001) return false;
+    return !!mountain.world.castRay(
+      new R.Ray(origin, { x: dx / length, y: dy / length, z: dz / length }),
+      Math.max(0, length - 0.15),
+      true,
+      R.QueryFilterFlags.EXCLUDE_DYNAMIC | R.QueryFilterFlags.EXCLUDE_SENSORS,
+    );
+  });
+  const airVisual = createAirVisual(scene, document, (x, z) => {
+    const distance = nearestTrack({ x, z }).distance;
+    if (distance < 5) return mountain.routeHeight(x, z) + 0.075;
+    if (distance < 6.4) return mountain.routeHeight(x, z) + 0.04;
+    return mountain.terrain.sampleSurfaceHeight(x, z);
+  });
   const session = createGameSession();
   document.body.classList.add('is-menu');
   element('startMenu').hidden = false;
@@ -201,6 +223,8 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
   let cameraSnapped = false,
     lookingBack = false;
   function resetPursuit() {
+    air.reset();
+    airVisual.reset();
     reinforcements.reset();
     backupModel.rig.visible = false;
     session.resetRound();
@@ -227,13 +251,13 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     lap = 1;
     setPaused(false);
   }
-  function losePursuit() {
+  function losePursuit(fromAir = false) {
     session.lose();
     clearInput();
     accumulator = 0;
     element('pauseOverlay').classList.remove('show');
     element('caught-result').textContent =
-      `Sobreviviste ${Math.floor(police.elapsed)} s · Intensidad ${police.difficulty.level}/${police.difficulty.levelCount}`;
+      `Sobreviviste ${Math.floor(police.elapsed)} s · Intensidad ${police.difficulty.level}/${police.difficulty.levelCount}${fromAir ? ' · Captura aérea' : ''}`;
     element('gameOver').hidden = false;
     element('restart').focus({ preventScroll: true });
   }
@@ -433,6 +457,13 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       `ESCAPA · ${(CAPTURE_SECONDS - session.captureSeconds).toFixed(1)} S`;
     element('capture-meter').style.width = `${session.captureProgress * 100}%`;
     element('capture-bar').setAttribute('aria-valuenow', session.captureSeconds.toFixed(1));
+    element('air-hud').hidden = !air.active;
+    element('air-status').textContent = air.illuminated
+      ? `SAL DEL FOCO · ${(AIR_CAPTURE_SECONDS - air.exposure).toFixed(1)} S`
+      : 'HELICÓPTERO · 230 KM/H';
+    element('air-hud').classList.toggle('illuminated', air.illuminated);
+    element('air-meter').style.width = `${(air.exposure / AIR_CAPTURE_SECONDS) * 100}%`;
+    element('air-capture').setAttribute('aria-valuenow', air.exposure.toFixed(1));
     const velocity = body.linvel(),
       speed = Math.hypot(velocity.x, velocity.z) * 3.6;
     speedEl.textContent = String(Math.round(speed));
@@ -486,6 +517,9 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       pursuitSeconds: +police.elapsed.toFixed(2),
       policeLevel: difficulty.level,
       policeCount: reinforcements.officer ? 2 : 1,
+      helicopterActive: air.active,
+      illuminated: air.illuminated,
+      airCaptureSeconds: air.exposure,
       policeDistance: +policeDistance.toFixed(2),
       fps: measuredFps,
       drawCalls: renderer.info.render.calls,
@@ -508,6 +542,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       police.body.translation(),
       simTime,
       reinforcements.officer ? [reinforcements.officer.body.translation()] : [],
+      air.active ? air.position : undefined,
     );
   }
   function physicsTick(dt: number) {
@@ -536,6 +571,11 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     mountain.boundary.enforce(body);
     mountain.boundary.enforce(police.body);
     simTime += dt;
+    air.step(dt, police.elapsed, body.translation(), body.linvel());
+    if (air.caught) {
+      losePursuit(true);
+      return;
+    }
     if (
       session.updateCapture(police.touches(body) || !!reinforcements.officer?.touches(body), dt)
     ) {
@@ -545,11 +585,13 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     if (police.difficulty.level !== lastPoliceLevel) {
       lastPoliceLevel = police.difficulty.level;
       notice(
-        police.difficulty.level === 6
-          ? 'REFUERZOS · Dos patrullas en persecución'
-          : police.difficulty.maximumAlert
-            ? 'ALERTA MÁXIMA · La patrulla alcanza 200 km/h'
-            : `Sube la presión · Intensidad ${lastPoliceLevel}/${police.difficulty.levelCount}`,
+        police.difficulty.level === 7
+          ? 'APOYO AÉREO · Evita el foco blanco'
+          : police.difficulty.level === 6
+            ? 'REFUERZOS · Dos patrullas en persecución'
+            : police.difficulty.maximumAlert
+              ? 'ALERTA MÁXIMA · La patrulla alcanza 200 km/h'
+              : `Sube la presión · Intensidad ${lastPoliceLevel}/${police.difficulty.levelCount}`,
       );
     }
     if (input.up || input.down) {
@@ -630,6 +672,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
   function draw(dt: number, previewTime = simTime) {
     const p = body.translation(),
       q = body.rotation();
+    airVisual.update(air, dt, previewTime);
     rig.position.set(p.x, p.y, p.z);
     rigQuat.set(q.x, q.y, q.z, q.w);
     rig.quaternion.copy(rigQuat);
@@ -743,6 +786,8 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
         root === rig ||
         root === policeModel.rig ||
         root === backupModel.rig ||
+        root === airVisual.group ||
+        root === airVisual.effects ||
         root === sky ||
         root === key.target ||
         root instanceof THREE.Light,

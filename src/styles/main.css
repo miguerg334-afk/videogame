@@ -858,3 +858,32 @@ body.is-menu .notice {
     animation: none;
   }
 }
+
+.air-hud {
+  border-top: 1px solid #fff3;
+  margin-top: 10px;
+  padding-top: 10px;
+}
+.air-hud[hidden] {
+  display: none;
+}
+.air-hud small {
+  color: #c3ced8;
+}
+.air-hud.illuminated small {
+  color: #fff;
+  font-weight: 700;
+}
+.air-capture {
+  height: 4px;
+  background: #ffffff20;
+  margin-top: 8px;
+  overflow: hidden;
+}
+.air-capture i {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: #f3f6ff;
+  transition: width 0.1s linear;
+}

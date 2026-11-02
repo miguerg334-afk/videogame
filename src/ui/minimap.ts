@@ -64,6 +64,7 @@ export function createMinimap(
     police?: VectorLike,
     time = 0,
     reinforcements: VectorLike[] = [],
+    helicopter?: VectorLike,
   ) {
     mapContext.clearRect(0, 0, 296, 224);
     mapContext.drawImage(mapBase, 0, 0);
@@ -75,6 +76,18 @@ export function createMinimap(
       mapContext.fill();
       mapContext.strokeStyle = '#fff';
       mapContext.lineWidth = 1;
+      mapContext.stroke();
+    }
+    if (helicopter) {
+      const [x, y] = mapPoint(helicopter.x, helicopter.z);
+      mapContext.strokeStyle = '#ffffff';
+      mapContext.lineWidth = 1.5;
+      mapContext.beginPath();
+      mapContext.arc(x, y, 7, 0, Math.PI * 2);
+      mapContext.moveTo(x - 10, y);
+      mapContext.lineTo(x + 10, y);
+      mapContext.moveTo(x, y - 10);
+      mapContext.lineTo(x, y + 10);
       mapContext.stroke();
     }
     const f = rotateVector(q, { x: 1, y: 0, z: 0 }),

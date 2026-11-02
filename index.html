@@ -22,7 +22,7 @@
     <div
       id="stage"
       tabindex="0"
-      aria-label="Circuito 3D. Usa las flechas para conducir, espacio para el freno de mano y R para reiniciar la persecución. Escapa antes de acumular 5 segundos de contacto continuo con la policía. C o 1 a 4 cambian la cámara exterior; mantén B para mirar atrás."
+      aria-label="Circuito 3D. Usa las flechas para conducir, espacio para el freno de mano y R para reiniciar la persecución. Escapa antes de acumular 5 segundos de contacto continuo con la policía o bajo el foco del helicóptero. C o 1 a 4 cambian la cámara exterior; mantén B para mirar atrás."
     ></div>
     <section id="startMenu" class="start-menu" aria-labelledby="menu-title">
       <div class="menu-panel">
@@ -52,7 +52,9 @@
             alcanza un máximo de 130 km/h y se activa la alerta máxima: la barra roja parpadea y la
             patrulla puede llegar a 200 km/h. Usa las curvas y los caminos de tierra para sacarle
             ventaja. Un minuto después llega el nivel 6/6: una segunda patrulla de 200 km/h se une a
-            la caza. Localízalas en el minimapa o mantén B para mirar atrás.
+            la caza. A los 5 minutos llega el nivel 7/7 con un helicóptero de 230 km/h: sal de su
+            círculo blanco antes de acumular 5 segundos seguidos bajo el foco. Localízalos en el
+            minimapa o mantén B para mirar atrás.
           </p>
         </details>
       </div>
@@ -102,6 +104,20 @@
           aria-valuenow="0"
         >
           <i id="capture-meter"></i>
+        </div>
+      </div>
+      <div id="air-hud" class="air-hud" hidden>
+        <small id="air-status">HELICÓPTERO · EN BÚSQUEDA</small>
+        <div
+          id="air-capture"
+          class="air-capture"
+          role="progressbar"
+          aria-label="Captura por el foco del helicóptero"
+          aria-valuemin="0"
+          aria-valuemax="5"
+          aria-valuenow="0"
+        >
+          <i id="air-meter"></i>
         </div>
       </div>
       <small class="rear-hint">MANTÉN B · MIRAR ATRÁS</small>
