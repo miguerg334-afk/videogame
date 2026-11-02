@@ -694,6 +694,21 @@ body.is-menu .notice {
 .menu-help p {
   margin-bottom: 0;
 }
+.menu-stages {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0 0;
+  display: grid;
+  gap: 10px;
+}
+.menu-stages li {
+  border-left: 2px solid #6eb5ff55;
+  padding-left: 10px;
+}
+.menu-stages strong {
+  display: block;
+  color: #dce9f9;
+}
 .menu-help kbd {
   font: inherit;
   color: #dce9f9;
