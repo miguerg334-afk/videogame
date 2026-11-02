@@ -150,7 +150,12 @@ export function addRoadDetails(
   const count = Math.floor(length / 28);
   const studs = new THREE.InstancedMesh(
     new THREE.BoxGeometry(0.2, 0.018, 0.13),
-    new THREE.MeshLambertMaterial({ color: 0xe7d8a4, emissive: 0x342b16 }),
+    new THREE.MeshPhongMaterial({
+      color: 0xe7d8a4,
+      emissive: 0x342b16,
+      specular: 0x000000,
+      shininess: 0,
+    }),
     count,
   );
   const object = new THREE.Object3D();

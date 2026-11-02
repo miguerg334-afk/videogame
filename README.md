@@ -40,7 +40,7 @@ El coche y buena parte del escenario se construyen mediante geometría y textura
 
 La IA combina una predicción del movimiento del jugador con una búsqueda de rutas sobre la carretera y los caminos. La navegación da instrucciones de dirección, acelerador y freno: el desplazamiento del coche lo resuelve la física.
 
-Para reducir el trabajo gráfico se utilizan sectores de terreno, descarte fuera de cámara, niveles de detalle en montañas y árboles, geometrías compartidas y resolución adaptativa. La carretera usa materiales de iluminación difusa sin relieve ni reflejos, marcas agrupadas por sectores y reflectores espaciados; las rejillas y juntas pequeñas se sustituyen por un diseño más limpio. El escenario está abierto, sin túneles; el coche usa dos luces locales dinámicas. Las colisiones de los troncos se activan cerca de cualquiera de los dos coches. Ambos vehículos se simulan juntos en un único paso del mundo físico.
+Para reducir el trabajo gráfico se utilizan sectores de terreno, descarte fuera de cámara, niveles de detalle en montañas y árboles, geometrías compartidas y resolución adaptativa. La carretera usa materiales mates con iluminación por píxel, sin relieve ni reflejos, marcas agrupadas por sectores y reflectores espaciados; las rejillas y juntas pequeñas se sustituyen por un diseño más limpio. El escenario está abierto, sin túneles; el coche usa dos luces locales dinámicas. Las colisiones de los troncos se activan cerca de cualquiera de los dos coches. Ambos vehículos se simulan juntos en un único paso del mundo físico.
 
 ## Controles
 

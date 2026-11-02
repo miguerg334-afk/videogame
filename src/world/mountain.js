@@ -37,10 +37,14 @@ export function createMountainWorld(scene, car, document) {
   }
   const roadMaterials = createRoadMaterials(document);
   const { asphalt, shoulder: gravel } = roadMaterials;
-  const grass = new THREE.MeshLambertMaterial({
+  const grass = new THREE.MeshPhongMaterial({
+      specular: 0x000000,
+      shininess: 0,
       color: new THREE.Color(0x758b57).convertSRGBToLinear(),
     }),
-    stripe = new THREE.MeshLambertMaterial({
+    stripe = new THREE.MeshPhongMaterial({
+      specular: 0x000000,
+      shininess: 0,
       color: new THREE.Color(0xe7e5d4).convertSRGBToLinear(),
     }),
     railMat = material(0xb5bfc0, 0.5),

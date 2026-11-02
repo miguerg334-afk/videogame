@@ -48,9 +48,20 @@ export function createRoadMaterials(document: Document) {
   shoulderMap.encoding = THREE.sRGBEncoding;
   shoulderMap.wrapS = shoulderMap.wrapT = THREE.RepeatWrapping;
   shoulderMap.anisotropy = 2;
-  // Diffuse lighting retains headlight visibility without per-pixel PBR, bump or environment work.
-  const asphalt = new THREE.MeshLambertMaterial({ color: 0xffffff, map: asphaltMap });
-  const shoulder = new THREE.MeshLambertMaterial({ color: 0xc5c0af, map: shoulderMap });
+  // Phong evaluates the headlight cone per pixel, avoiding vertex-lighting bands on coarse road tiles.
+  // A black specular term retains the lightweight matte finish without PBR or bump maps.
+  const asphalt = new THREE.MeshPhongMaterial({
+    color: 0xffffff,
+    map: asphaltMap,
+    specular: 0x000000,
+    shininess: 0,
+  });
+  const shoulder = new THREE.MeshPhongMaterial({
+    color: 0xc5c0af,
+    map: shoulderMap,
+    specular: 0x000000,
+    shininess: 0,
+  });
   return {
     asphalt,
     shoulder,
