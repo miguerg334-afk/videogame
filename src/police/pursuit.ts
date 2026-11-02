@@ -51,6 +51,9 @@ export function createPursuit(
     started = false;
   let stalled = 0,
     reversing = 0,
+    escapeTurn = 0,
+    escapeSteer = -1,
+    turnaroundSide = 0,
     overturnedFor = 0;
   let state = { speed: 0, steering: 0, throttle: 0, contacts: 0, reverse: false, braking: false };
 
@@ -62,7 +65,8 @@ export function createPursuit(
     targetKnown = false;
     replanIn = 0;
     head = 0;
-    elapsed = stalled = reversing = overturnedFor = 0;
+    elapsed = stalled = reversing = escapeTurn = turnaroundSide = overturnedFor = 0;
+    escapeSteer = -1;
     started = false;
     const direction = path[1].clone().sub(path[0]);
     sim.reset(
@@ -108,7 +112,7 @@ export function createPursuit(
     if (overturnedFor >= 1) {
       // The same recovery as F: preserve X/Z, heading, route, clock and speed limit.
       sim.recover(groundHeight);
-      overturnedFor = stalled = reversing = 0;
+      overturnedFor = stalled = reversing = escapeTurn = turnaroundSide = 0;
       state = { speed: 0, steering: 0, throttle: 0, contacts: 0, reverse: false, braking: false };
     }
   }
@@ -193,31 +197,69 @@ export function createPursuit(
     let routeRemaining = closest.distanceTo(path[head + 1]);
     for (let i = head + 1; i < path.length - 1 && routeRemaining < 200; i++)
       routeRemaining += path[i].distanceTo(path[i + 1]);
-    const desiredSpeed = Math.min(
+    let desiredSpeed = Math.min(
       difficulty.maxSpeed,
       cornerSpeed,
       targetVelocity.length() + Math.sqrt(8 * Math.max(3, routeRemaining)),
     );
     const active = started && elapsed >= 3;
-    if (active && speed < 0.65 && remaining > 5 && state.contacts >= 2) stalled += dt;
-    else stalled = 0;
-    if (stalled > 3) {
-      reversing = 1.2;
-      stalled = 0;
-    }
-    reversing = Math.max(0, reversing - dt);
-    controls.steeringAxis = THREE.MathUtils.clamp(
-      Math.atan(2.756 * curvature) / (0.51 / (1 + speed * 0.035)),
-      -1,
-      1,
-    );
-    controls.throttleAxis = 0.72 + difficulty.intensity * 0.28;
+    const signedSpeed = velocity.x * forward.x + velocity.y * forward.y + velocity.z * forward.z;
     const tipped = rotateVector(body.rotation(), { x: 0, y: 1, z: 0 }).y < 0.35;
-    controls.up = active && !tipped && reversing === 0 && speed < desiredSpeed;
-    controls.down = active && !tipped && (reversing > 0 || speed > desiredSpeed + 0.8);
-    if (reversing > 0) controls.steeringAxis *= -1;
-    // Hold on slopes during the initial grace period with the ordinary wheel brakes.
-    controls.handbrake = !active || tipped;
+    // Brake from forward velocity only. Braking from |velocity| could latch reverse forever.
+    if (Math.abs(angle) > 1.8 && !turnaroundSide) turnaroundSide = Math.sign(angle) || 1;
+    if (Math.abs(angle) < 0.8) turnaroundSide = 0;
+    if (turnaroundSide) desiredSpeed = Math.min(desiredSpeed, 5.5);
+    controls.steeringAxis =
+      turnaroundSide ||
+      THREE.MathUtils.clamp(Math.atan(2.756 * curvature) / (0.51 / (1 + speed * 0.035)), -1, 1);
+    controls.throttleAxis = 0.72 + difficulty.intensity * 0.28;
+    if (active && !tipped && reversing === 0 && speed < 1.2 && remaining > 5 && state.contacts >= 2)
+      stalled += dt;
+    else stalled = 0;
+    if (stalled >= 0.65) {
+      // Pick a free side once, then commit to a short three-point manoeuvre instead of
+      // repeatedly aiming straight back at the same trunk. Only probe when actually stuck.
+      const clearance = (side: number) => {
+        const c = Math.cos(0.8),
+          s = Math.sin(0.8) * side;
+        const direction = {
+          x: forward.x * c + forward.z * s,
+          y: 0,
+          z: forward.z * c - forward.x * s,
+        };
+        const hit = world.castRay(
+          new R.Ray({ x: p.x, y: p.y + 0.4, z: p.z }, direction),
+          8,
+          true,
+          R.QueryFilterFlags.EXCLUDE_DYNAMIC | R.QueryFilterFlags.EXCLUDE_SENSORS,
+        );
+        return hit?.timeOfImpact ?? 8;
+      };
+      const left = clearance(1),
+        right = clearance(-1);
+      escapeSteer = Math.abs(left - right) > 0.5 ? (left > right ? 1 : -1) : -escapeSteer;
+      reversing = 1.1;
+      escapeTurn = 1.8;
+      stalled = 0;
+      replanIn = 0;
+    }
+    if (reversing > 0) {
+      reversing = Math.max(0, reversing - dt);
+      controls.steeringAxis = -escapeSteer;
+      controls.up = false;
+      controls.down = active && !tipped && signedSpeed > -3.5;
+      controls.handbrake = !active || tipped || signedSpeed <= -3.5;
+    } else {
+      if (escapeTurn > 0) {
+        escapeTurn = Math.max(0, escapeTurn - dt);
+        controls.steeringAxis = escapeSteer;
+        desiredSpeed = Math.min(desiredSpeed, 6);
+      }
+      controls.up = active && !tipped && signedSpeed < desiredSpeed;
+      controls.down = active && !tipped && signedSpeed > Math.max(0.8, desiredSpeed + 0.8);
+      // Hold during the initial grace period; reverse is exclusive to the bounded escape phase.
+      controls.handbrake = !active || tipped;
+    }
     sim.prepare(controls, dt, offroad);
     if (head > 512) {
       path.splice(0, head);

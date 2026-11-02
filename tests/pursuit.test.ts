@@ -145,7 +145,7 @@ test('la patrulla alcanza 200 km/h y el jugador conserva su máximo de 130 con f
   try {
     for (let tick = 0; tick < 60 * 240; tick++) {
       // Parallel lanes isolate each governor from inter-car contact impulses.
-      police.step(dt, { x: sim.body.translation().x + 500, y: 0.65, z: 0 }, true);
+      police.step(dt, { x: sim.body.translation().x + 10000, y: 0.65, z: 0 }, true);
       sim.setPursuitTime(police.elapsed);
       sim.step({ ...neutral, up: true }, dt);
       police.afterStep();
@@ -219,7 +219,7 @@ test('ambos coches mantienen tracción física y límites respectivos en pendien
     try {
       for (let tick = 0; tick < 120 * 210; tick++) {
         const p = sim.body.translation();
-        police.step(dt, { x: p.x + 500, y: (p.x + 500) * grade + 0.65, z: 0 }, true);
+        police.step(dt, { x: p.x + 10000, y: (p.x + 10000) * grade + 0.65, z: 0 }, true);
         sim.setPursuitTime(police.elapsed);
         sim.step({ ...neutral, up: true }, dt);
         police.afterStep();
