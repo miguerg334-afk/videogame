@@ -838,3 +838,23 @@ body.is-menu .notice {
   background: linear-gradient(90deg, #ffbc62, #ff3859);
   transition: width 0.1s linear;
 }
+
+/* Maximum pursuit: a full red warning bar with a beacon-like pulse. */
+.pursuit-bar i.maximum-alert {
+  background: #ff304f;
+  animation: maximum-pursuit 0.6s steps(1, end) infinite;
+}
+@keyframes maximum-pursuit {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pursuit-bar i.maximum-alert {
+    animation: none;
+  }
+}

@@ -380,6 +380,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     element('pursuit-distance').textContent = police.started
       ? `POLICÍA A ${Math.round(policeDistance)} M · ${Math.floor(police.elapsed)} S`
       : 'ACELERA PARA COMENZAR';
+    element('pursuit-meter').classList.toggle('maximum-alert', difficulty.maximumAlert);
     element('pursuit-meter').style.width = `${8 + difficulty.intensity * 92}%`;
     element('capture-warning').hidden = session.captureSeconds === 0;
     element('capture-label').textContent =
@@ -480,7 +481,11 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     }
     if (police.difficulty.level !== lastPoliceLevel) {
       lastPoliceLevel = police.difficulty.level;
-      notice(`Sube la presión · Intensidad ${lastPoliceLevel}/5`);
+      notice(
+        police.difficulty.maximumAlert
+          ? 'ALERTA MÁXIMA · La patrulla alcanza 200 km/h'
+          : `Sube la presión · Intensidad ${lastPoliceLevel}/5`,
+      );
     }
     if (input.up || input.down) {
       if (lapStart === null) lapStart = simTime;

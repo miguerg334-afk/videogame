@@ -21,8 +21,18 @@ test('la presión empieza baja, aumenta gradualmente y se limita a cinco intensi
   assert.equal(pursuitDifficulty(45).level, 2);
   assert.equal(pursuitDifficulty(90).level, 3);
   assert.equal(pursuitDifficulty(180).level, 5);
-  assert(Math.abs(pursuitDifficulty(600).maxSpeed * 3.6 - 150) < 1e-8);
+  assert(Math.abs(pursuitDifficulty(600).maxSpeed * 3.6 - 200) < 1e-8);
   assert.equal(pursuitDifficulty(-1).level, 1);
+});
+
+test('la alerta máxima comienza exactamente a los tres minutos y se reinicia con la ronda', () => {
+  assert.equal(pursuitDifficulty(179.999).maximumAlert, false);
+  assert(policeSpeedLimitKmh(179.999) < 150);
+  assert.equal(pursuitDifficulty(180).maximumAlert, true);
+  assert.equal(policeSpeedLimitKmh(180), 200);
+  assert.equal(policeSpeedLimitKmh(600), 200);
+  assert.equal(pursuitSpeedLimitKmh(180), 130);
+  assert.equal(pursuitDifficulty(0).maximumAlert, false);
 });
 
 test('la patrulla conduce una curva con suspensión y no sigue una posición impuesta', () => {
@@ -118,7 +128,7 @@ test('detecta contacto real, sin confundir proximidad ni separación vertical', 
   }
 });
 
-test('la patrulla alcanza 150 km/h y el jugador conserva su máximo de 130', () => {
+test('la patrulla alcanza 200 km/h y el jugador conserva su máximo de 130', () => {
   const world = new R.World({ x: 0, y: -9.81, z: 0 });
   world.createCollider(R.ColliderDesc.cuboid(15000, 0.1, 50).setTranslation(7000, -0.1, 0));
   const police = createPursuit(world),
@@ -150,7 +160,7 @@ test('la patrulla alcanza 150 km/h y el jugador conserva su máximo de 130', () 
       if (tick === 120 * 120)
         gapAtTwoMinutes = sim.body.translation().x - police.body.translation().x;
     }
-    assert(playerMaximum > 129.9 && policeMaximum > 149.9);
+    assert(playerMaximum > 129.9 && policeMaximum > 199.9);
     assert(
       sim.body.translation().x - police.body.translation().x < gapAtTwoMinutes - 70,
       'la velocidad extra permite recuperar distancia',
@@ -167,7 +177,7 @@ test('la patrulla alcanza 150 km/h y el jugador conserva su máximo de 130', () 
   }
 });
 
-test('progresión de 100 a 130 para el jugador y de 106 a 150 para la patrulla', () => {
+test('progresión de 100 a 130 para el jugador y de 106 a 200 con alerta máxima para la patrulla', () => {
   for (const [time, speed] of [
     [0, 100],
     [45, 107.5],
@@ -181,7 +191,7 @@ test('progresión de 100 a 130 para el jugador y de 106 a 150 para la patrulla',
     assert(
       Math.abs(
         pursuitDifficulty(time).maxSpeed * 3.6 -
-          (speed + 6 + 14 * Math.max(0, Math.min(1, time / 180))),
+          (time >= 180 ? 200 : speed + 6 + 14 * Math.max(0, Math.min(1, time / 180))),
       ) < 1e-8,
     );
   }

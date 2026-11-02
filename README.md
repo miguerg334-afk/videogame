@@ -10,7 +10,7 @@ Un juego de conducción 3D para navegador, con carreteras de montaña, exploraci
 
 - **Persecución dinámica:** la patrulla busca interceptar tu posición actual y anticipa tu movimiento. Puede elegir rutas en ambos sentidos y usar los atajos.
 - **Choques con margen para escapar:** un golpe no termina la partida. La policía necesita mantener **5 segundos de contacto** para atraparte; separarte reinicia la captura. Una cuenta atrás muestra el peligro.
-- **Dificultad progresiva:** la intensidad aumenta cada 45 segundos. Tu velocidad máxima pasa de **100 a 130 km/h** y el máximo de la patrulla aumenta de **106 a 150 km/h**.
+- **Dificultad progresiva:** la intensidad aumenta cada 45 segundos. Tu velocidad máxima pasa de **100 a 130 km/h** y el máximo de la patrulla aumenta de **106 a 150 km/h**. A los **3 minutos** se activa la **alerta máxima**: la barra se vuelve roja y parpadea, y la patrulla puede alcanzar **200 km/h**.
 - **Física compartida:** ambos coches tienen suspensión por rueda, motor, frenos, agarre y colisiones reales. Pueden perder velocidad, derrapar, saltar y volcar. Puedes enderezar tu coche en el mismo sitio; la patrulla también se recupera tras permanecer 1 segundo estable volcada.
 - **Montaña explorable:** un circuito de unos **5,2 km**, subidas y bajadas de hasta el 27 %, tres atajos de tierra y un entorno de **3,8 × 2,9 km** con 800 árboles.
 - **Ambiente nocturno:** luna visible, cordilleras, faros con encendido manual, luces policiales animadas y carretera a cielo abierto.

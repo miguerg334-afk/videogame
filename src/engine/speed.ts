@@ -10,10 +10,12 @@ export function pursuitSpeedLimitKmh(seconds: number) {
   return START_SPEED_KMH + (MAX_SPEED_KMH - START_SPEED_KMH) * progress;
 }
 
-/** A modest, explicit advantage; suspension, grip and forces stay identical. */
+/** Speed ceilings only: suspension, grip and forces stay identical. */
 export const POLICE_SPEED_BONUS_KMH = 6;
 export const POLICE_MAX_SPEED_KMH = 150;
+export const POLICE_ALERT_MAX_SPEED_KMH = 200;
 export function policeSpeedLimitKmh(seconds: number) {
+  if (seconds >= PURSUIT_RAMP_SECONDS) return POLICE_ALERT_MAX_SPEED_KMH;
   const progress = Math.max(0, Math.min(1, seconds / PURSUIT_RAMP_SECONDS));
   return (
     pursuitSpeedLimitKmh(seconds) +

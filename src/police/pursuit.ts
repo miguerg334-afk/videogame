@@ -11,6 +11,7 @@ export function pursuitDifficulty(seconds: number) {
   const intensity = THREE.MathUtils.clamp(seconds / PURSUIT_RAMP_SECONDS, 0, 1);
   return {
     intensity,
+    maximumAlert: seconds >= PURSUIT_RAMP_SECONDS,
     level: 1 + Math.min(4, Math.floor(seconds / PURSUIT_LEVEL_SECONDS)),
     maxSpeed: policeSpeedLimitKmh(seconds) / 3.6,
   };
