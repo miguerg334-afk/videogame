@@ -2,16 +2,16 @@ import * as THREE from 'three';
 import R from '@dimforge/rapier3d-compat/rapier.es.js';
 import type { DrivingInput, VectorLike } from '../engine/types';
 import { rotateVector } from '../engine/math';
-import { policeSpeedLimitKmh } from '../engine/speed';
+import { policeSpeedLimitKmh, PURSUIT_LEVEL_SECONDS, PURSUIT_RAMP_SECONDS } from '../engine/speed';
 import type { PursuitNavigation } from './navigation';
 import { createDrivingPhysics } from '../vehicle/physics';
 
 export function pursuitDifficulty(seconds: number) {
   seconds = Math.max(0, seconds);
-  const intensity = THREE.MathUtils.clamp(seconds / 120, 0, 1);
+  const intensity = THREE.MathUtils.clamp(seconds / PURSUIT_RAMP_SECONDS, 0, 1);
   return {
     intensity,
-    level: 1 + Math.min(4, Math.floor(seconds / 30)),
+    level: 1 + Math.min(4, Math.floor(seconds / PURSUIT_LEVEL_SECONDS)),
     maxSpeed: policeSpeedLimitKmh(seconds) / 3.6,
   };
 }
@@ -104,7 +104,7 @@ export function createPursuit(
       settled = !!hit && hit.normal.y > 0.35;
     }
     overturnedFor = settled ? overturnedFor + dt : 0;
-    if (overturnedFor >= 2.5) {
+    if (overturnedFor >= 1) {
       // The same recovery as F: preserve X/Z, heading, route, clock and speed limit.
       sim.recover(groundHeight);
       overturnedFor = stalled = reversing = 0;

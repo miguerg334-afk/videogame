@@ -18,10 +18,10 @@ test('la presión empieza baja, aumenta gradualmente y se limita a cinco intensi
     assert(d.intensity >= 0 && d.intensity <= 1);
   }
   assert.equal(pursuitDifficulty(0).maxSpeed * 3.6, 106);
-  assert.equal(pursuitDifficulty(30).level, 2);
-  assert.equal(pursuitDifficulty(60).level, 3);
-  assert.equal(pursuitDifficulty(120).level, 5);
-  assert(Math.abs(pursuitDifficulty(600).maxSpeed * 3.6 - 135) < 1e-8);
+  assert.equal(pursuitDifficulty(45).level, 2);
+  assert.equal(pursuitDifficulty(90).level, 3);
+  assert.equal(pursuitDifficulty(180).level, 5);
+  assert(Math.abs(pursuitDifficulty(600).maxSpeed * 3.6 - 150) < 1e-8);
   assert.equal(pursuitDifficulty(-1).level, 1);
 });
 
@@ -118,7 +118,7 @@ test('detecta contacto real, sin confundir proximidad ni separación vertical', 
   }
 });
 
-test('la patrulla alcanza 135 km/h y el jugador conserva su máximo de 120', () => {
+test('la patrulla alcanza 150 km/h y el jugador conserva su máximo de 130', () => {
   const world = new R.World({ x: 0, y: -9.81, z: 0 });
   world.createCollider(R.ColliderDesc.cuboid(15000, 0.1, 50).setTranslation(7000, -0.1, 0));
   const police = createPursuit(world),
@@ -132,7 +132,7 @@ test('la patrulla alcanza 135 km/h y el jugador conserva su máximo de 120', () 
     policeMaximum = 0,
     gapAtTwoMinutes = 0;
   try {
-    for (let tick = 0; tick < 120 * 180; tick++) {
+    for (let tick = 0; tick < 120 * 240; tick++) {
       // Parallel lanes isolate each governor from inter-car contact impulses.
       police.step(dt, { x: sim.body.translation().x + 500, y: 0.65, z: 0 }, true);
       sim.setPursuitTime(police.elapsed);
@@ -145,12 +145,12 @@ test('la patrulla alcanza 135 km/h y el jugador conserva su máximo de 120', () 
       assert(
         Math.abs(police.difficulty.maxSpeed * 3.6 - policeSpeedLimitKmh(police.elapsed)) < 1e-8,
       );
-      assert(playerSpeed <= 120.0001);
+      assert(playerSpeed <= 130.0001);
       assert(police.speed * 3.6 <= policeSpeedLimitKmh(police.elapsed) + 0.001);
       if (tick === 120 * 120)
         gapAtTwoMinutes = sim.body.translation().x - police.body.translation().x;
     }
-    assert(playerMaximum > 119.9 && policeMaximum > 134.9);
+    assert(playerMaximum > 129.9 && policeMaximum > 149.9);
     assert(
       sim.body.translation().x - police.body.translation().x < gapAtTwoMinutes - 70,
       'la velocidad extra permite recuperar distancia',
@@ -167,21 +167,21 @@ test('la patrulla alcanza 135 km/h y el jugador conserva su máximo de 120', () 
   }
 });
 
-test('progresión de 100 a 120 para el jugador y de 106 a 135 para la patrulla', () => {
+test('progresión de 100 a 130 para el jugador y de 106 a 150 para la patrulla', () => {
   for (const [time, speed] of [
     [0, 100],
-    [30, 105],
-    [60, 110],
+    [45, 107.5],
     [90, 115],
-    [120, 120],
-    [600, 120],
+    [135, 122.5],
+    [180, 130],
+    [600, 130],
     [-1, 100],
   ]) {
     assert.equal(pursuitSpeedLimitKmh(time), speed);
     assert(
       Math.abs(
         pursuitDifficulty(time).maxSpeed * 3.6 -
-          (speed + 6 + 9 * Math.max(0, Math.min(1, time / 120))),
+          (speed + 6 + 14 * Math.max(0, Math.min(1, time / 180))),
       ) < 1e-8,
     );
   }
@@ -203,17 +203,25 @@ test('ambos coches mantienen tracción física y límites respectivos en pendien
       { x: -55, y: 0.65 - 55 * grade, z: 0 },
       { x: 0, y: 0.65, z: 0 },
     ]);
+    let playerPeak = 0,
+      policePeak = 0;
     try {
-      for (let tick = 0; tick < 120 * 150; tick++) {
+      for (let tick = 0; tick < 120 * 210; tick++) {
         const p = sim.body.translation();
         police.step(dt, { x: p.x + 500, y: (p.x + 500) * grade + 0.65, z: 0 }, true);
         sim.setPursuitTime(police.elapsed);
         sim.step({ ...neutral, up: true }, dt);
         police.afterStep();
+        const velocity = sim.body.linvel();
+        const playerSpeed = Math.hypot(velocity.x, velocity.z) * 3.6;
+        const policeSpeed = police.speed * 3.6;
+        playerPeak = Math.max(playerPeak, playerSpeed);
+        policePeak = Math.max(policePeak, policeSpeed);
+        assert(playerSpeed <= pursuitSpeedLimitKmh(police.elapsed) + 0.001);
+        assert(policeSpeed <= policeSpeedLimitKmh(police.elapsed) + 0.001);
       }
-      const v = sim.body.linvel();
-      assert(Math.hypot(v.x, v.z) * 3.6 > 119.9);
-      assert(police.speed * 3.6 > 134.8 && police.speed * 3.6 < 135.01);
+      assert(playerPeak > 129.9, 'el jugador alcanza su máximo en la pendiente');
+      assert(policePeak > 149.8, 'la patrulla alcanza su máximo en la pendiente');
       const p = police.body.translation();
       assert(p.y - grade * p.x > 0.3, 'la patrulla permanece apoyada en la pendiente');
     } finally {

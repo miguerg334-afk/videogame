@@ -54,7 +54,7 @@ bootstrap().catch((error: unknown) => {
   console.error(error);
   element('loading').style.display = 'grid';
   element('loadText').textContent =
-    `No se pudo iniciar la ruta: ${error instanceof Error ? error.message : String(error)}. Recarga la página para volver a intentarlo.`;
+    'No pudimos iniciar el juego. Recarga la página para volver a intentarlo. Si el problema continúa, prueba un navegador con aceleración gráfica activada.';
 });
 
 if (import.meta.hot) {

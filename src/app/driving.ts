@@ -139,7 +139,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     resetCar(true);
     firstDrive = false;
     element('instructions').style.opacity = '1';
-    notice('Evita el contacto · C cambia la cámara · B mira atrás');
+    notice('Acelera para empezar · B para vigilar a la patrulla');
     stage.focus({ preventScroll: true });
   }
   function openMenu() {
@@ -208,7 +208,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     nextSector = (lastSector + 1) % 4;
     lapValid = initial || lastSector === 0;
     resetPursuit();
-    if (!initial) notice('Nueva persecución · Tienes ventaja, ¡arranca!');
+    if (!initial) notice('La patrulla está en camino. ¡Acelera!');
   }
   function recoverCar() {
     if (session.inMenu || session.caught) return;
@@ -216,7 +216,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     clearInput();
     lastState = { speed: 0, steering: 0, throttle: 0, contacts: 0, reverse: false, braking: false };
     cameraSnapped = false;
-    notice('Coche enderezado en el mismo lugar');
+    notice('De vuelta sobre las ruedas. ¡Sigue!');
     if (!session.running) draw(0);
     stage.focus({ preventScroll: true });
   }
@@ -379,7 +379,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     element('pursuit-level').textContent = `INTENSIDAD ${difficulty.level}/5`;
     element('pursuit-distance').textContent = police.started
       ? `POLICÍA A ${Math.round(policeDistance)} M · ${Math.floor(police.elapsed)} S`
-      : 'ARRANCA PARA COMENZAR';
+      : 'ACELERA PARA COMENZAR';
     element('pursuit-meter').style.width = `${8 + difficulty.intensity * 92}%`;
     element('capture-warning').hidden = session.captureSeconds === 0;
     element('capture-label').textContent =
@@ -480,7 +480,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     }
     if (police.difficulty.level !== lastPoliceLevel) {
       lastPoliceLevel = police.difficulty.level;
-      notice(`La policía acelera · Intensidad ${lastPoliceLevel}/5`);
+      notice(`Sube la presión · Intensidad ${lastPoliceLevel}/5`);
     }
     if (input.up || input.down) {
       if (lapStart === null) lapStart = simTime;
@@ -657,7 +657,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     setPaused(true);
     element('loading').style.display = 'grid';
     element('loadText').textContent =
-      'Se perdió el contexto gráfico. Recarga la página para continuar.';
+      'La imagen se ha interrumpido. Recarga la página para volver a jugar.';
   });
   const updateMovingTransforms = freezeWorldTransforms(
     scene,

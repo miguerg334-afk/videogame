@@ -42,7 +42,7 @@ test('la patrulla se endereza tras quedar volcada, conserva el progreso y vuelve
       police.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
       const elapsed = police.elapsed,
         level = police.difficulty.level;
-      for (let i = 0; i < 240; i++) tick();
+      for (let i = 0; i < 60; i++) tick();
       assert(
         rotateVector(police.body.rotation(), { x: 0, y: 1, z: 0 }).y < 0.35,
         'no se endereza instantáneamente',
@@ -63,7 +63,7 @@ test('la patrulla se endereza tras quedar volcada, conserva el progreso y vuelve
             'conserva el rumbo',
           );
           assert(rotateVector(police.body.rotation(), { x: 0, y: 1, z: 0 }).y > 0.9);
-          assert(police.elapsed > elapsed + 2.5 && police.elapsed < elapsed + 8);
+          assert(police.elapsed > elapsed + 1 && police.elapsed < elapsed + 2.5);
           assert.equal(police.difficulty.level, level, 'no reinicia la dificultad');
           assert(police.difficulty.maxSpeed * 3.6 > 105, 'conserva el límite progresivo');
           recovered = true;

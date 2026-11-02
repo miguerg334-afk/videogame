@@ -6,9 +6,17 @@
     <meta name="theme-color" content="#152321" />
     <meta
       name="description"
-      content="Un viaje nocturno por la sierra: conducción libre entre montañas y caminos a cielo abierto."
+      content="Escapa de la policía en una persecución nocturna 3D. Explora la sierra, domina los atajos y resiste una presión que no deja de subir. Juega gratis en tu navegador."
     />
-    <title>APEX — Night Drive</title>
+    <title>APEX — Night Drive | Persecución policial 3D</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="APEX — Night Drive" />
+    <meta
+      property="og:description"
+      content="La noche es tuya. Escapa de la policía, encuentra tu ruta y aguanta hasta el límite. Juega gratis en tu navegador."
+    />
+    <meta property="og:url" content="https://apex-night-drive.pages.dev/" />
   </head>
   <body class="is-menu">
     <div
@@ -19,30 +27,30 @@
     <section id="startMenu" class="start-menu" aria-labelledby="menu-title">
       <div class="menu-panel">
         <div class="menu-brand">APEX <b>/</b> NIGHT DRIVE</div>
-        <span class="menu-kicker">SIERRA · PERSECUCIÓN NOCTURNA</span>
+        <span class="menu-kicker">MUNDO ABIERTO · PERSECUCIÓN POLICIAL</span>
         <h1 id="menu-title">NIGHT<br /><em>PURSUIT</em></h1>
         <p class="menu-description">
-          La patrulla busca interceptarte. Toma los atajos, cruza la montaña y aguanta todo lo que
-          puedas.
+          La noche es tuya. Pisa a fondo, encuentra tu ruta entre las montañas y deja atrás a la
+          patrulla. ¿Cuánto tiempo puedes resistir?
         </p>
         <div class="menu-rule">
-          <span class="police-dot"></span>La policía necesita 5 segundos de contacto continuo para
-          atraparte. Sepárate para escapar.
+          <span class="police-dot"></span>Cinco segundos acorralado y se acabó. Rompe el contacto y
+          sigue en la carrera.
         </div>
-        <button id="play" class="play-button">Comenzar persecución <span>→</span></button>
+        <button id="play" class="play-button">Jugar ahora <span>→</span></button>
         <details class="menu-help">
-          <summary>Controles y reglas</summary>
+          <summary>Cómo jugar</summary>
           <p>
             <kbd>↑ ↓</kbd> Acelerar / frenar · <kbd>← →</kbd> Girar<br />
             <kbd>Espacio</kbd> Freno de mano · <kbd>C</kbd> Cambiar cámara<br />
             <kbd>1—4</kbd> Elegir cámara · Mantén <kbd>B</kbd> para mirar atrás<br />
-            <kbd>F</kbd> Enderezar aquí · <kbd>P</kbd> Pausa · <kbd>R</kbd> Reiniciar ·
+            <kbd>F</kbd> Enderezar el coche · <kbd>P</kbd> Pausa · <kbd>R</kbd> Reiniciar ·
             <kbd>L</kbd> Luces
           </p>
           <p>
-            Tu máximo sube de 100 a 120 km/h; el máximo de la patrulla aumenta de 106 a 135 km/h. La
-            intensidad policial sube cada 30 segundos. El minimapa, la distancia y la dirección
-            indican dónde está la patrulla.
+            Tu objetivo: resistir. Cada 45 segundos aumenta la intensidad; a los 3 minutos, tu coche
+            alcanza un máximo de 130 km/h y la patrulla, 150 km/h. Usa las curvas y los caminos de
+            tierra para sacarle ventaja. Localízala en el minimapa o mantén B para mirar atrás.
           </p>
         </details>
       </div>
@@ -69,7 +77,7 @@
           <option value="3">Retrovisor</option>
         </select>
       </label>
-      <button id="recover" title="Enderezar aquí, sin reiniciar la persecución">
+      <button id="recover" title="Enderezar el coche, sin reiniciar la persecución">
         F · Enderezar
       </button>
       <button id="reset" title="Reiniciar la persecución desde intensidad 1">R · Reiniciar</button
@@ -78,7 +86,7 @@
     <div class="pursuit-hud" aria-label="Estado de la persecución">
       <span>PERSECUCIÓN</span><strong id="pursuit-level">INTENSIDAD 1/5</strong>
       <div class="pursuit-bar"><i id="pursuit-meter"></i></div>
-      <small id="pursuit-distance">ARRANCA PARA COMENZAR</small>
+      <small id="pursuit-distance">ACELERA PARA COMENZAR</small>
       <small id="police-direction" class="police-direction">DETRÁS</small>
       <div id="capture-warning" class="capture-warning" hidden>
         <small id="capture-label">ESCAPA · 5.0 S</small>
@@ -166,15 +174,14 @@
       aria-modal="true"
       aria-labelledby="caught-title"
     >
-      <span class="caught-eyebrow">FIN DE LA PERSECUCIÓN</span>
-      <strong id="caught-title">TE ATRAPARON</strong>
+      <span class="caught-eyebrow">FIN DE LA HUIDA</span>
+      <strong id="caught-title">CAPTURADO</strong>
       <p id="caught-result"></p>
-      <button id="restart">Volver a intentarlo · R</button>
+      <button id="restart">Otra oportunidad · R</button>
       <button id="caught-menu" class="secondary-action">Menú de inicio</button>
     </div>
     <div id="loading" class="loading" role="status">
-      <strong>APEX / DRIVE</strong
-      ><span id="loadText">Construyendo el circuito y preparando la física…</span>
+      <strong>APEX / DRIVE</strong><span id="loadText">Preparando tu próxima huida…</span>
     </div>
     <output id="stats" aria-hidden="true"></output>
     <script type="module" src="/src/main.ts"></script>
