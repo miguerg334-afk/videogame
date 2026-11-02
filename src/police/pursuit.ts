@@ -2,7 +2,12 @@ import * as THREE from 'three';
 import R from '@dimforge/rapier3d-compat/rapier.es.js';
 import type { DrivingInput, VectorLike } from '../engine/types';
 import { rotateVector } from '../engine/math';
-import { policeSpeedLimitKmh, PURSUIT_LEVEL_SECONDS, PURSUIT_RAMP_SECONDS } from '../engine/speed';
+import {
+  policeSpeedLimitKmh,
+  PURSUIT_LEVEL_SECONDS,
+  PURSUIT_RAMP_SECONDS,
+  REINFORCEMENT_SECONDS,
+} from '../engine/speed';
 import type { PursuitNavigation } from './navigation';
 import { createDrivingPhysics } from '../vehicle/physics';
 
@@ -12,7 +17,11 @@ export function pursuitDifficulty(seconds: number) {
   return {
     intensity,
     maximumAlert: seconds >= PURSUIT_RAMP_SECONDS,
-    level: 1 + Math.min(4, Math.floor(seconds / PURSUIT_LEVEL_SECONDS)),
+    level:
+      seconds >= REINFORCEMENT_SECONDS
+        ? 6
+        : 1 + Math.min(4, Math.floor(seconds / PURSUIT_LEVEL_SECONDS)),
+    levelCount: seconds >= REINFORCEMENT_SECONDS ? 6 : 5,
     maxSpeed: policeSpeedLimitKmh(seconds) / 3.6,
   };
 }
@@ -57,7 +66,7 @@ export function createPursuit(
     overturnedFor = 0;
   let state = { speed: 0, steering: 0, throttle: 0, contacts: 0, reverse: false, braking: false };
 
-  function reset(seed: VectorLike[]) {
+  function reset(seed: VectorLike[], pursuitSeconds = 0) {
     if (seed.length < 2) throw new Error('La persecución necesita una ruta inicial');
     path = seed.map((p) => new THREE.Vector3(p.x, p.y, p.z));
     lastTarget.copy(path[path.length - 1]);
@@ -74,6 +83,9 @@ export function createPursuit(
       -Math.atan2(direction.z, direction.x),
       direction.y / Math.max(0.01, Math.hypot(direction.x, direction.z)),
     );
+    elapsed = Math.max(0, pursuitSeconds);
+    started = elapsed > 0;
+    sim.setPursuitTime(elapsed);
     state = { speed: 0, steering: 0, throttle: 0, contacts: 0, reverse: false, braking: false };
   }
 

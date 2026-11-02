@@ -37,12 +37,7 @@ export function createMountainWorld(scene, car, document) {
   }
   const roadMaterials = createRoadMaterials(document);
   const { asphalt, shoulder: gravel } = roadMaterials;
-  const grass = new THREE.MeshPhongMaterial({
-      specular: 0x000000,
-      shininess: 0,
-      color: new THREE.Color(0x758b57).convertSRGBToLinear(),
-    }),
-    stripe = new THREE.MeshPhongMaterial({
+  const stripe = new THREE.MeshPhongMaterial({
       specular: 0x000000,
       shininess: 0,
       color: new THREE.Color(0xe7e5d4).convertSRGBToLinear(),
@@ -97,7 +92,7 @@ export function createMountainWorld(scene, car, document) {
   const terrain = createTerrain(scene, world, terrainHeight);
   addDistantRanges(scene);
   roadMaterials.setLength(trackLength);
-  function ribbon(a, b, mat, lift = 0, collider = false, curb = false) {
+  function ribbon(a, b, mat, lift = 0, collider = false, curb = false, render = true) {
     const v = [],
       uv = [],
       indices = [],
@@ -144,12 +139,13 @@ export function createMountainWorld(scene, car, document) {
         ).setFriction(1),
       );
     m.name = 'road-surface';
-    tileSurface(scene, m, 400);
+    if (render) tileSurface(scene, m, 400);
     scene.remove(m);
     g.dispose();
     return m;
   }
-  ribbon(-24, 24, grass, -0.15, true);
+  // Keep the verge collision surface, but expose the continuous dark terrain underneath.
+  ribbon(-24, 24, gravel, -0.15, true, false, false);
   ribbon(-6.4, 6.4, gravel, -0.035);
   ribbon(-5, 5, asphalt, 0, true);
   ribbon(-4.83, -4.72, stripe, 0.012);

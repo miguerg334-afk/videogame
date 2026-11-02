@@ -169,8 +169,11 @@ export function createForest(
   // Refresh after 25 m of travel, well before reaching the 110 m activation edge.
   const active = new Map<number, R.Collider>();
   let previous: { x: number; z: number }[] = [];
-  function updateColliders(position: { x: number; z: number }, pursuer?: { x: number; z: number }) {
-    const centers = pursuer ? [position, pursuer] : [position];
+  function updateColliders(
+    position: { x: number; z: number },
+    ...pursuers: ({ x: number; z: number } | undefined)[]
+  ) {
+    const centers = [position, ...pursuers.filter((p): p is { x: number; z: number } => !!p)];
     if (
       previous.length === centers.length &&
       centers.every((p, i) => (p.x - previous[i].x) ** 2 + (p.z - previous[i].z) ** 2 < 25 ** 2)

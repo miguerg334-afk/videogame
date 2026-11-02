@@ -51,6 +51,19 @@ test('conserva todos los árboles y activa sus choques antes de que el coche pue
     forest.updateColliders(first, far);
     map.world.step();
     assert(trunk(first) && trunk(far), 'los dos coches tienen colisiones en zonas separadas');
+    const third = forest.positions.find(
+      (p) =>
+        Math.hypot(p.x - first.x, p.z - first.z) > 300 &&
+        Math.hypot(p.x - far.x, p.z - far.z) > 300,
+    );
+    assert(third);
+    forest.updateColliders(first, far, third);
+    map.world.step();
+    assert(
+      trunk(first) && trunk(far) && trunk(third),
+      'jugador y dos patrullas mantienen colisiones en sus regiones',
+    );
+
     forest.updateColliders(far);
     map.world.step();
     assert(!trunk(first) && trunk(far), 'descarga la región que ya no necesita ningún coche');

@@ -58,11 +58,17 @@ export function createMinimap(
   const startXY = mapPoint(start.p.x, start.p.z);
   mc.fillStyle = '#f1f0d3';
   mc.fillRect(startXY[0] - 3, startXY[1] - 4, 6, 8);
-  function drawMap(p: VectorLike, q: QuaternionLike, police?: VectorLike, time = 0) {
+  function drawMap(
+    p: VectorLike,
+    q: QuaternionLike,
+    police?: VectorLike,
+    time = 0,
+    reinforcements: VectorLike[] = [],
+  ) {
     mapContext.clearRect(0, 0, 296, 224);
     mapContext.drawImage(mapBase, 0, 0);
-    if (police) {
-      const [x, y] = mapPoint(police.x, police.z);
+    for (const officer of police ? [police, ...reinforcements] : reinforcements) {
+      const [x, y] = mapPoint(officer.x, officer.z);
       mapContext.fillStyle = Math.floor(time * 8) % 2 ? '#ff4b66' : '#4cafff';
       mapContext.beginPath();
       mapContext.arc(x, y, 5, 0, Math.PI * 2);

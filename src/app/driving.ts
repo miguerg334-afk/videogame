@@ -15,6 +15,7 @@ import { createContactShadow } from '../vehicle/contact-shadow';
 import { freezeWorldTransforms } from '../engine/transforms';
 import { createPoliceModel } from '../police/model';
 import { createPursuit } from '../police/pursuit';
+import { createReinforcements } from '../police/reinforcements';
 import { createPursuitNavigation } from '../police/navigation';
 import { CAPTURE_SECONDS, createGameSession } from './session';
 import { renderRatioLimit } from '../engine/quality';
@@ -49,20 +50,59 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
   const { body, vehicle } = sim;
   const policeModel = createPoliceModel(model, document);
   scene.add(policeModel.rig);
-  const police = createPursuit(
+  const navigation = createPursuitNavigation(mountain);
+  const police = createPursuit(mountain.world, driveGroundHeight, navigation);
+  const backupModel = createPoliceModel(model, document);
+  backupModel.rig.visible = false;
+  scene.add(backupModel.rig);
+  const reinforcements = createReinforcements(
+    police,
     mountain.world,
     driveGroundHeight,
-    createPursuitNavigation(mountain),
+    navigation,
+    () => {
+      const player = body.translation(),
+        near = nearestTrack(player);
+      for (const distance of [80, 110, 140, 170, 200]) {
+        const index = (near.index - Math.ceil(distance / (mountain.trackLength / N)) + N) % N;
+        for (const lateral of [-2.5, 2.5]) {
+          const start = offsetPoint(frames[index], lateral);
+          const other = police.body.translation();
+          if (Math.hypot(start.x - other.x, start.z - other.z) < 12) continue;
+          const next = offsetPoint(frames[(index + 8) % N], lateral);
+          return [
+            { x: start.x, y: start.y + 0.7, z: start.z },
+            { x: next.x, y: next.y + 0.7, z: next.z },
+          ];
+        }
+      }
+      const f = frames[(near.index + N - 200) % N];
+      return [{ x: f.p.x, y: f.p.y + 0.7, z: f.p.z }, player];
+    },
   );
+  function closestOfficer(position: import('../engine/types').VectorLike) {
+    const backup = reinforcements.officer;
+    if (!backup) return police;
+    const a = police.body.translation(),
+      b = backup.body.translation();
+    return (a.x - position.x) ** 2 + (a.z - position.z) ** 2 <=
+      (b.x - position.x) ** 2 + (b.z - position.z) ** 2
+      ? police
+      : backup;
+  }
   const session = createGameSession();
   document.body.classList.add('is-menu');
   element('startMenu').hidden = false;
   const exhaustFlames = createExhaustFlames(model.car);
   const carShadow = createContactShadow(rig);
   const policeShadow = createContactShadow(policeModel.rig);
+  const backupShadow = createContactShadow(backupModel.rig);
   const lifecycle = createLifecycle();
   const { listen, listenDocument, listenElement } = lifecycle;
-  lifecycle.onDispose(() => police.dispose());
+  lifecycle.onDispose(() => {
+    reinforcements.reset();
+    police.dispose();
+  });
   let animationFrame = 0;
 
   let lightsOn = true;
@@ -161,6 +201,8 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
   let cameraSnapped = false,
     lookingBack = false;
   function resetPursuit() {
+    reinforcements.reset();
+    backupModel.rig.visible = false;
     session.resetRound();
     element('gameOver').hidden = true;
     lastPoliceLevel = 1;
@@ -191,7 +233,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     accumulator = 0;
     element('pauseOverlay').classList.remove('show');
     element('caught-result').textContent =
-      `Sobreviviste ${Math.floor(police.elapsed)} s · Intensidad ${police.difficulty.level}/5`;
+      `Sobreviviste ${Math.floor(police.elapsed)} s · Intensidad ${police.difficulty.level}/${police.difficulty.levelCount}`;
     element('gameOver').hidden = false;
     element('restart').focus({ preventScroll: true });
   }
@@ -373,13 +415,14 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
   function updateHUD() {
     const difficulty = police.difficulty,
       target = body.translation(),
-      pursuer = police.body.translation();
+      pursuer = closestOfficer(target).body.translation();
     const policeDistance = Math.hypot(
       target.x - pursuer.x,
       target.y - pursuer.y,
       target.z - pursuer.z,
     );
-    element('pursuit-level').textContent = `INTENSIDAD ${difficulty.level}/5`;
+    element('pursuit-level').textContent =
+      `INTENSIDAD ${difficulty.level}/${difficulty.levelCount}`;
     element('pursuit-distance').textContent = police.started
       ? `POLICÍA A ${Math.round(policeDistance)} M · ${Math.floor(police.elapsed)} S`
       : 'ACELERA PARA COMENZAR';
@@ -442,6 +485,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       captureSeconds: +session.captureSeconds.toFixed(2),
       pursuitSeconds: +police.elapsed.toFixed(2),
       policeLevel: difficulty.level,
+      policeCount: reinforcements.officer ? 2 : 1,
       policeDistance: +policeDistance.toFixed(2),
       fps: measuredFps,
       drawCalls: renderer.info.render.calls,
@@ -458,10 +502,20 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     hudPolice.set(pursuer.x, pursuer.y, pursuer.z);
     hudRotation.set(q.x, q.y, q.z, q.w);
     element('police-direction').textContent = policeBearing(hudPlayer, hudRotation, hudPolice);
-    drawMap(body.translation(), body.rotation(), police.body.translation(), simTime);
+    drawMap(
+      body.translation(),
+      body.rotation(),
+      police.body.translation(),
+      simTime,
+      reinforcements.officer ? [reinforcements.officer.body.translation()] : [],
+    );
   }
   function physicsTick(dt: number) {
-    mountain.forest.updateColliders(body.translation(), police.body.translation());
+    mountain.forest.updateColliders(
+      body.translation(),
+      police.body.translation(),
+      reinforcements.officer?.body.translation(),
+    );
     nearest = nearestTrack(body.translation());
     police.step(
       dt,
@@ -469,25 +523,33 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       input.up || input.down || Math.abs(lastState.speed) > 0.5,
       nearestTrack(police.body.translation()).distance > 4.2,
     );
+    reinforcements.prepare(dt, body.translation(), (p) => nearestTrack(p).distance > 4.2);
+    backupModel.rig.visible = !!reinforcements.officer;
     sim.setPursuitTime(police.elapsed);
     sim.prepare(input, dt, nearest.distance > 4.2);
     mountain.world.timestep = dt;
     mountain.world.step();
     lastState = sim.finish();
     police.afterStep();
+    reinforcements.officer?.afterStep();
+    if (reinforcements.officer) mountain.boundary.enforce(reinforcements.officer.body);
     mountain.boundary.enforce(body);
     mountain.boundary.enforce(police.body);
     simTime += dt;
-    if (session.updateCapture(police.touches(body), dt)) {
+    if (
+      session.updateCapture(police.touches(body) || !!reinforcements.officer?.touches(body), dt)
+    ) {
       losePursuit();
       return;
     }
     if (police.difficulty.level !== lastPoliceLevel) {
       lastPoliceLevel = police.difficulty.level;
       notice(
-        police.difficulty.maximumAlert
-          ? 'ALERTA MÁXIMA · La patrulla alcanza 200 km/h'
-          : `Sube la presión · Intensidad ${lastPoliceLevel}/5`,
+        police.difficulty.level === 6
+          ? 'REFUERZOS · Dos patrullas en persecución'
+          : police.difficulty.maximumAlert
+            ? 'ALERTA MÁXIMA · La patrulla alcanza 200 km/h'
+            : `Sube la presión · Intensidad ${lastPoliceLevel}/${police.difficulty.levelCount}`,
       );
     }
     if (input.up || input.down) {
@@ -545,29 +607,36 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     rigQuat = new THREE.Quaternion(),
     policeCameraPosition = new THREE.Vector3(),
     lookAt = vec(0, 0, 0);
+  function updateOfficer(
+    officer: ReturnType<typeof createPursuit>,
+    appearance: ReturnType<typeof createPoliceModel>,
+    shadow: THREE.Mesh,
+    dt: number,
+    time: number,
+  ) {
+    const p = officer.body.translation(),
+      q = officer.body.rotation();
+    appearance.rig.position.set(p.x, p.y, p.z);
+    appearance.rig.quaternion.set(q.x, q.y, q.z, q.w);
+    appearance.update(time, officer.speed, dt);
+    shadow.visible = officer.state.contacts > 1;
+    for (let i = 0; i < 4; i++) {
+      appearance.wheels[i].pivot.position.y =
+        (0.66 - (officer.vehicle.wheelSuspensionLength(i) ?? 0.32)) / 0.52;
+      appearance.wheels[i].pivot.rotation.y = officer.vehicle.wheelSteering(i) ?? 0;
+      appearance.wheels[i].roll.rotation.z = -(officer.vehicle.wheelRotation(i) ?? 0);
+    }
+  }
   function draw(dt: number, previewTime = simTime) {
     const p = body.translation(),
       q = body.rotation();
     rig.position.set(p.x, p.y, p.z);
     rigQuat.set(q.x, q.y, q.z, q.w);
     rig.quaternion.copy(rigQuat);
-    const policePosition = police.body.translation(),
-      policeRotation = police.body.rotation();
-    policeModel.rig.position.set(policePosition.x, policePosition.y, policePosition.z);
-    policeModel.rig.quaternion.set(
-      policeRotation.x,
-      policeRotation.y,
-      policeRotation.z,
-      policeRotation.w,
-    );
-    policeModel.update(previewTime, police.speed, dt);
-    policeShadow.visible = police.state.contacts > 1;
-    for (let i = 0; i < 4; i++) {
-      policeModel.wheels[i].pivot.position.y =
-        (0.66 - (police.vehicle.wheelSuspensionLength(i) ?? 0.32)) / 0.52;
-      policeModel.wheels[i].pivot.rotation.y = police.vehicle.wheelSteering(i) ?? 0;
-      policeModel.wheels[i].roll.rotation.z = -(police.vehicle.wheelRotation(i) ?? 0);
-    }
+    const policePosition = closestOfficer(p).body.translation();
+    updateOfficer(police, policeModel, policeShadow, dt, previewTime);
+    if (reinforcements.officer)
+      updateOfficer(reinforcements.officer, backupModel, backupShadow, dt, previewTime);
     for (let i = 0; i < 4; i++) {
       const length = vehicle.wheelSuspensionLength(i) ?? 0.32;
       wheelAssemblies[i].pivot.position.y = (0.48 + 0.18 - length) / 0.52;
@@ -673,6 +742,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       (root) =>
         root === rig ||
         root === policeModel.rig ||
+        root === backupModel.rig ||
         root === sky ||
         root === key.target ||
         root instanceof THREE.Light,
