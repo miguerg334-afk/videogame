@@ -20,6 +20,9 @@ import { CAPTURE_SECONDS, createGameSession } from './session';
 import { renderRatioLimit } from '../engine/quality';
 import { DRIVING_CAMERAS, frameDrivingCamera, policeBearing } from '../engine/driving-cameras';
 
+const PHYSICS_STEP = 1 / 60;
+const MAX_PHYSICS_STEPS = 4;
+
 type Dependencies = {
   rendering: ReturnType<typeof createRenderer>;
   model: ReturnType<typeof createVehicleModel>;
@@ -442,7 +445,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       policeDistance: +policeDistance.toFixed(2),
       fps: measuredFps,
       drawCalls: renderer.info.render.calls,
-      physicsHz: 120,
+      physicsHz: 1 / PHYSICS_STEP,
       activeTreeColliders: mountain.forest.activeColliderCount,
       triangles: renderer.info.render.triangles,
       pixelRatio: renderer.getPixelRatio(),
@@ -628,15 +631,15 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
         element('fps').textContent = measuredFps + ' FPS';
       }
       if (quality.sample(rawDt)) renderer.setPixelRatio(quality.ratio);
-      accumulator = Math.min(accumulator + dt, 8 / 120);
+      accumulator = Math.min(accumulator + dt, MAX_PHYSICS_STEPS * PHYSICS_STEP);
       let steps = 0;
-      while (accumulator >= 1 / 120 && steps++ < 8) {
-        physicsTick(1 / 120);
+      while (accumulator >= PHYSICS_STEP && steps++ < MAX_PHYSICS_STEPS) {
+        physicsTick(PHYSICS_STEP);
         if (session.caught) {
           accumulator = 0;
           break;
         }
-        accumulator -= 1 / 120;
+        accumulator -= PHYSICS_STEP;
       }
       draw(dt);
     } else if (session.inMenu && now - lastMenuFrame >= 1000 / 30 && !document.hidden) {

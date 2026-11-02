@@ -252,3 +252,45 @@ export function addTerrainLOD(scene: THREE.Scene, tiles: THREE.Mesh[], nearDista
   }
   return { nearTriangles, farTriangles };
 }
+
+/** Local bounds allow Three r128 to cull static instance batches independently. */
+export function tileInstances(scene: THREE.Scene, source: THREE.InstancedMesh, size = 400) {
+  const buckets = new Map<string, THREE.Matrix4[]>();
+  const matrix = new THREE.Matrix4();
+  for (let i = 0; i < source.count; i++) {
+    source.getMatrixAt(i, matrix);
+    const key = `${Math.floor(matrix.elements[12] / size)},${Math.floor(matrix.elements[14] / size)}`;
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key)!.push(matrix.clone());
+  }
+  const batches: THREE.InstancedMesh[] = [];
+  source.geometry.computeBoundingSphere();
+  for (const transforms of buckets.values()) {
+    const center = new THREE.Vector3();
+    for (const m of transforms) center.add(new THREE.Vector3().setFromMatrixPosition(m));
+    center.divideScalar(transforms.length);
+    const geometry = source.geometry.clone();
+    const batch = new THREE.InstancedMesh(geometry, source.material, transforms.length);
+    const sphere = source.geometry.boundingSphere!.clone();
+    let radius = 0;
+    transforms.forEach((m, i) => {
+      m.elements[12] -= center.x;
+      m.elements[13] -= center.y;
+      m.elements[14] -= center.z;
+      batch.setMatrixAt(i, m);
+      const bound = sphere.clone().applyMatrix4(m);
+      radius = Math.max(radius, bound.center.length() + bound.radius);
+    });
+    geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), radius);
+    batch.position.copy(center);
+    batch.name = source.name + '-cell';
+    batch.frustumCulled = true;
+    batch.updateMatrix();
+    batch.matrixAutoUpdate = false;
+    scene.add(batch);
+    batches.push(batch);
+  }
+  scene.remove(source);
+  source.geometry.dispose();
+  return batches;
+}

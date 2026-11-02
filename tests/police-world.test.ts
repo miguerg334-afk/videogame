@@ -17,11 +17,11 @@ const ctx = new Proxy(
 const doc = {
   createElement: () => ({ width: 0, height: 0, getContext: () => ctx }),
 } as unknown as Document;
-test('la persecución al objetivo actual atraviesa los tramos abiertos del norte y sur con física real', () => {
+test('la persecución al objetivo actual atraviesa los tramos abiertos del norte y sur con física real a 60 Hz', () => {
   const scene = new THREE.Scene(),
     map = createMountainWorld(scene, new THREE.Group(), doc);
   const police = createPursuit(map.world, map.driveGroundHeight, createPursuitNavigation(map));
-  const dt = 1 / 120,
+  const dt = 1 / 60,
     spacing = map.trackLength / map.N;
   map.world.timestep = dt;
   try {
@@ -47,7 +47,7 @@ test('la persecución al objetivo actual atraviesa los tramos abiertos del norte
       let passed = false,
         minimumClearance = Infinity,
         routeDeviation = 0;
-      for (let tick = 0; tick < 120 * 22; tick++) {
+      for (let tick = 0; tick < 60 * 22; tick++) {
         const frame = map.frames[(start + Math.floor((60 + tick * dt * 27) / spacing)) % map.N];
         const p = police.body.translation(),
           near = map.nearestTrack(p);

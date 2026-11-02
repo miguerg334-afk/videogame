@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as THREE from 'three';
-import { tileSurface, addForestLOD, addTerrainLOD } from '../src/world/visibility';
+import { tileSurface, tileInstances, addForestLOD, addTerrainLOD } from '../src/world/visibility';
 import { createAdaptiveQuality, renderRatioLimit } from '../src/engine/quality';
 
 test('los sectores conservan cada triángulo del terreno y sus atributos', () => {
@@ -161,4 +161,48 @@ test('el terreno lejano reduce triángulos sin cambiar las alturas ni abrir bord
     lod.update(camera);
     assert(!high.visible && low.visible);
   }
+});
+
+test('las marcas de carretera conservan sus posiciones y se descartan por sectores con límites completos', () => {
+  const scene = new THREE.Scene();
+  const source = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(3, 0.02, 0.1),
+    new THREE.MeshLambertMaterial(),
+    10,
+  );
+  const matrix = new THREE.Matrix4();
+  for (let i = 0; i < 10; i++) source.setMatrixAt(i, matrix.makeTranslation(i * 200, i * 20, 10));
+  const cells = tileInstances(scene, source, 400);
+  assert.equal(
+    cells.reduce((sum, cell) => sum + cell.count, 0),
+    10,
+  );
+  const positions: number[] = [];
+  for (const cell of cells) {
+    assert(cell.frustumCulled);
+    for (let i = 0; i < cell.count; i++) {
+      cell.getMatrixAt(i, matrix);
+      positions.push(matrix.elements[12] + cell.position.x);
+      const p = new THREE.Vector3().setFromMatrixPosition(matrix);
+      assert(p.length() + 1.5 <= cell.geometry.boundingSphere!.radius + 0.01);
+    }
+  }
+  assert.deepEqual(
+    positions.sort((a, b) => a - b),
+    Array.from({ length: 10 }, (_, i) => i * 200),
+  );
+  scene.updateMatrixWorld(true);
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 300);
+  camera.position.set(0, 10, 20);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld(true);
+  const frustum = new THREE.Frustum().setFromProjectionMatrix(
+    new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse),
+  );
+  assert(
+    cells.filter((c) => frustum.intersectsObject(c)).length < cells.length,
+    'no envía las instancias de todo el circuito',
+  );
+  for (const c of cells) c.geometry.dispose();
+  (source.material as THREE.Material).dispose();
 });

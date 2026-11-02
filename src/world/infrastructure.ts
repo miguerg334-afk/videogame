@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { tileInstances } from './visibility';
 import type { RouteFrame } from '../engine/types';
 
 type OffsetPoint = (frame: RouteFrame, distance: number, lift?: number) => THREE.Vector3;
@@ -145,89 +146,23 @@ export function addRoadDetails(
   offset: OffsetPoint,
   length: number,
 ) {
-  const count = Math.floor(length / 14),
-    object = new THREE.Object3D();
-  const housings = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(0.16, 0.026, 0.12),
-    metal(0x656e73),
-    count,
-  );
+  // Sparse reflectors replace housings, grates, slots and asphalt seam meshes.
+  const count = Math.floor(length / 28);
   const studs = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(0.025, 0.018, 0.09),
-    new THREE.MeshStandardMaterial({
-      color: 0xe7d8a4,
-      emissive: 0xc1a76c,
-      emissiveIntensity: 0.25,
-      metalness: 0.35,
-      roughness: 0.2,
-    }),
+    new THREE.BoxGeometry(0.2, 0.018, 0.13),
+    new THREE.MeshLambertMaterial({ color: 0xe7d8a4, emissive: 0x342b16 }),
     count,
   );
-  const drainCount = Math.floor(length / 35);
-  const drains = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(0.74, 0.018, 0.32),
-    metal(0x42494a, 0.85),
-    drainCount * 2,
-  );
-  const slots = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(0.025, 0.006, 0.25),
-    new THREE.MeshBasicMaterial({ color: 0x161d20 }),
-    drainCount * 12,
-  );
-  const seamCount = Math.floor(length / 29);
-  const seals = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(0.65, 0.0025, 0.022),
-    new THREE.MeshStandardMaterial({ color: 0x202626, roughness: 0.95 }),
-    seamCount * 3,
-  );
+  const object = new THREE.Object3D();
   for (let i = 0; i < count; i++) {
     const frame = frames[Math.floor(((i + 0.5) / count) * (frames.length - 1))];
     object.position.copy(offset(frame, 0, 0.026));
     object.rotation.set(0, -Math.atan2(frame.tangent.z, frame.tangent.x), Math.atan(frame.grade));
     object.updateMatrix();
-    housings.setMatrixAt(i, object.matrix);
-    object.position.addScaledVector(frame.tangent, -0.075);
-    object.position.y += 0.012;
-    object.updateMatrix();
     studs.setMatrixAt(i, object.matrix);
   }
-  let drain = 0,
-    slot = 0;
-  for (let i = 0; i < drainCount; i++) {
-    const frame = frames[Math.floor((i / drainCount) * (frames.length - 1))];
-    for (const side of [-1, 1]) {
-      const position = offset(frame, side * 5.88, -0.013);
-      object.position.copy(position);
-      object.rotation.set(0, -Math.atan2(frame.tangent.z, frame.tangent.x), Math.atan(frame.grade));
-      object.updateMatrix();
-      drains.setMatrixAt(drain++, object.matrix);
-      for (let j = 0; j < 6; j++) {
-        object.position.copy(position).addScaledVector(frame.tangent, (j - 2.5) * 0.105);
-        object.position.y += 0.012;
-        object.updateMatrix();
-        slots.setMatrixAt(slot++, object.matrix);
-      }
-    }
-  }
-  for (let i = 0; i < seamCount; i++) {
-    const frame = frames[Math.floor(((i + 0.25) / seamCount) * (frames.length - 1))];
-    for (let j = 0; j < 3; j++) {
-      object.position.copy(offset(frame, ((i % 7) - 3) * 0.65 + j * 0.21, 0.004));
-      object.position.addScaledVector(frame.tangent, j * 0.42);
-      object.rotation.set(
-        0,
-        -Math.atan2(frame.tangent.z, frame.tangent.x) + (j - 1) * 0.48,
-        Math.atan(frame.grade),
-      );
-      object.updateMatrix();
-      seals.setMatrixAt(i * 3 + j, object.matrix);
-    }
-  }
-  for (const [name, mesh] of Object.entries({ housings, studs, drains, slots, seals })) {
-    mesh.name = `road-${name}`;
-    mesh.receiveShadow = true;
-    scene.add(mesh);
-  }
+  studs.name = 'road-reflectors';
+  tileInstances(scene, studs);
 }
 
 export function detailGantry(gantry: THREE.Group) {

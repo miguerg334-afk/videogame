@@ -29,7 +29,7 @@ Un juego de conducción 3D para navegador, con carreteras de montaña, exploraci
 | Tecnología | Su papel en el juego |
 | --- | --- |
 | **Three.js** | Escena 3D y renderizado WebGL: coches, terreno, iluminación, materiales y cámaras. |
-| **Rapier 3D + WebAssembly** | Cuerpos físicos, colisiones, suspensión y ruedas de ambos coches. La simulación funciona a 120 Hz. |
+| **Rapier 3D + WebAssembly** | Cuerpos físicos, colisiones, suspensión y ruedas de ambos coches. La simulación funciona a 60 Hz. |
 | **TypeScript y JavaScript** | Lógica del juego, conducción, IA policial, navegación, generación del mundo y gestión de la escena. |
 | **Vite** | Organización de módulos y compilación de la aplicación para la web. |
 | **GSAP** | Animaciones de entrada de la interfaz. |
@@ -40,7 +40,7 @@ El coche y buena parte del escenario se construyen mediante geometría y textura
 
 La IA combina una predicción del movimiento del jugador con una búsqueda de rutas sobre la carretera y los caminos. La navegación da instrucciones de dirección, acelerador y freno: el desplazamiento del coche lo resuelve la física.
 
-Para reducir el trabajo gráfico se utilizan sectores de terreno, descarte fuera de cámara, niveles de detalle en montañas y árboles, geometrías compartidas y resolución adaptativa. El escenario está abierto, sin túneles; el coche usa dos luces locales dinámicas. Las colisiones de los troncos se activan cerca de cualquiera de los dos coches. Ambos vehículos se simulan juntos en un único paso del mundo físico.
+Para reducir el trabajo gráfico se utilizan sectores de terreno, descarte fuera de cámara, niveles de detalle en montañas y árboles, geometrías compartidas y resolución adaptativa. La carretera usa materiales de iluminación difusa sin relieve ni reflejos, marcas agrupadas por sectores y reflectores espaciados; las rejillas y juntas pequeñas se sustituyen por un diseño más limpio. El escenario está abierto, sin túneles; el coche usa dos luces locales dinámicas. Las colisiones de los troncos se activan cerca de cualquiera de los dos coches. Ambos vehículos se simulan juntos en un único paso del mundo físico.
 
 ## Controles
 

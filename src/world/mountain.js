@@ -6,6 +6,7 @@ import { addDistantRanges, addNightSky } from './background';
 import { createTrailNetwork, buildMountainTrails } from './trails';
 import { createForest } from './forest';
 import { createWorldBoundary } from './boundary';
+import { tileSurface, tileInstances } from './visibility';
 import { createRoadMaterials } from './road-materials';
 import { createIBeamGeometry, addRoadDetails, detailGantry } from './infrastructure';
 
@@ -36,15 +37,17 @@ export function createMountainWorld(scene, car, document) {
   }
   const roadMaterials = createRoadMaterials(document);
   const { asphalt, shoulder: gravel } = roadMaterials;
-  const grass = material(0x758b57),
-    stripe = material(0xe7e5d4),
+  const grass = new THREE.MeshLambertMaterial({
+      color: new THREE.Color(0x758b57).convertSRGBToLinear(),
+    }),
+    stripe = new THREE.MeshLambertMaterial({
+      color: new THREE.Color(0xe7e5d4).convertSRGBToLinear(),
+    }),
     railMat = material(0xb5bfc0, 0.5),
     postMat = material(0x545f5d);
   railMat.metalness = 0.72;
   railMat.roughness = 0.43;
   railMat.envMapIntensity = 0.6;
-  stripe.roughness = 0.62;
-  stripe.envMapIntensity = 0.4;
   const curve = new THREE.CatmullRomCurve3(
     routeAnchors.map(([x, z]) => vec(x, 0, z)),
     true,
@@ -115,7 +118,14 @@ export function createMountainWorld(scene, car, document) {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    g.setIndex(indices);
+    // Rendering can bridge four samples (~6 m); physics keeps every original sample.
+    const visualIndices = [];
+    for (let i = 0; i < N; i += 4) {
+      const a = i * 2,
+        b = Math.min(i + 4, N) * 2;
+      visualIndices.push(a, a + 1, b, a + 1, b + 1, b);
+    }
+    g.setIndex(visualIndices);
     if (curb) g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     g.computeVertexNormals();
     const m = new THREE.Mesh(g, mat);
@@ -129,6 +139,10 @@ export function createMountainWorld(scene, car, document) {
           R.TriMeshFlags.FIX_INTERNAL_EDGES,
         ).setFriction(1),
       );
+    m.name = 'road-surface';
+    tileSurface(scene, m, 400);
+    scene.remove(m);
+    g.dispose();
     return m;
   }
   ribbon(-24, 24, grass, -0.15, true);
@@ -136,11 +150,7 @@ export function createMountainWorld(scene, car, document) {
   ribbon(-5, 5, asphalt, 0, true);
   ribbon(-4.83, -4.72, stripe, 0.012);
   ribbon(4.72, 4.83, stripe, 0.012);
-  const curbMat = roadMaterials.concrete;
-  curbMat.color.set(0xffffff);
-  curbMat.vertexColors = true;
-  ribbon(-5.45, -5.02, curbMat, 0.018);
-  ribbon(5.02, 5.45, curbMat, 0.018);
+  // Flat gravel verges replace the extra concrete strips.
   const dashedCount = Math.floor(trackLength / 7),
     dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(2.8, 0.008, 0.115), stripe, dashedCount),
     transform = new THREE.Object3D();
@@ -155,7 +165,8 @@ export function createMountainWorld(scene, car, document) {
     transform.updateMatrix();
     dashes.setMatrixAt(i, transform.matrix);
   }
-  scene.add(dashes);
+  dashes.name = 'road-center-lines';
+  tileInstances(scene, dashes);
   // Both verges remain open for mountain exploration.
   addRoadDetails(scene, frames, offsetPoint, trackLength);
   buildMountainTrails(scene, world, trailNetwork, document);

@@ -128,7 +128,8 @@ test('detecta contacto real, sin confundir proximidad ni separación vertical', 
   }
 });
 
-test('la patrulla alcanza 200 km/h y el jugador conserva su máximo de 130', () => {
+test('la patrulla alcanza 200 km/h y el jugador conserva su máximo de 130 con física a 60 Hz', () => {
+  const dt = 1 / 60;
   const world = new R.World({ x: 0, y: -9.81, z: 0 });
   world.createCollider(R.ColliderDesc.cuboid(15000, 0.1, 50).setTranslation(7000, -0.1, 0));
   const police = createPursuit(world),
@@ -142,7 +143,7 @@ test('la patrulla alcanza 200 km/h y el jugador conserva su máximo de 130', () 
     policeMaximum = 0,
     gapAtTwoMinutes = 0;
   try {
-    for (let tick = 0; tick < 120 * 240; tick++) {
+    for (let tick = 0; tick < 60 * 240; tick++) {
       // Parallel lanes isolate each governor from inter-car contact impulses.
       police.step(dt, { x: sim.body.translation().x + 500, y: 0.65, z: 0 }, true);
       sim.setPursuitTime(police.elapsed);
@@ -157,7 +158,7 @@ test('la patrulla alcanza 200 km/h y el jugador conserva su máximo de 130', () 
       );
       assert(playerSpeed <= 130.0001);
       assert(police.speed * 3.6 <= policeSpeedLimitKmh(police.elapsed) + 0.001);
-      if (tick === 120 * 120)
+      if (tick === 60 * 120)
         gapAtTwoMinutes = sim.body.translation().x - police.body.translation().x;
     }
     assert(playerMaximum > 129.9 && policeMaximum > 199.9);
