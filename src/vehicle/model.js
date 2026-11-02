@@ -919,6 +919,80 @@ export function createVehicleModel(scene, renderer, document) {
     );
   }
   surface(spoilerRows, paint);
+  // Closed undertray: taper around the tyres, seal the cabin and both bumpers.
+  // These parts join the existing material batches and are shared by the police clone.
+  const floorOutline = new THREE.Shape();
+  const floorSections = [
+    [-4.25, 1.38],
+    [-3.65, 1.54],
+    [-3.5, 1.36],
+    [-1.8, 1.36],
+    [-1.7, 1.73],
+    [1.7, 1.73],
+    [1.8, 1.36],
+    [3.5, 1.36],
+    [3.65, 1.51],
+    [4.22, 1.39],
+  ];
+  floorOutline.moveTo(floorSections[0][0], -floorSections[0][1]);
+  for (const [x, width] of floorSections.slice(1)) floorOutline.lineTo(x, -width);
+  for (const [x, width] of [...floorSections].reverse()) floorOutline.lineTo(x, width);
+  floorOutline.closePath();
+  const undertray = mesh(
+    new THREE.ExtrudeGeometry(floorOutline, {
+      depth: 0.18,
+      bevelEnabled: false,
+      steps: 1,
+      curveSegments: 1,
+    }),
+    trim,
+  );
+  undertray.rotation.x = Math.PI / 2;
+  undertray.position.y = 0.53;
+  // Inner wheel-arch panels block the view through the body behind the wheels.
+  for (const axle of [-2.65, 2.65]) {
+    const well = new THREE.Shape();
+    well.moveTo(-0.87, 0.5);
+    well.lineTo(0.87, 0.5);
+    well.lineTo(0.87, 0.8);
+    for (let i = 0; i <= 16; i++) {
+      const angle = (i * Math.PI) / 16;
+      well.lineTo(Math.cos(angle) * 0.87, 0.8 + Math.sin(angle) * 0.87);
+    }
+    well.closePath();
+    for (const sign of [-1, 1]) {
+      const liner = mesh(
+        new THREE.ExtrudeGeometry(well, {
+          depth: 0.045,
+          bevelEnabled: false,
+          steps: 1,
+          curveSegments: 1,
+        }),
+        trim,
+      );
+      liner.position.set(axle, 0, sign > 0 ? 1.35 : -1.395);
+    }
+  }
+  // Shallow chassis detail, entirely above the tyre contact plane.
+  for (const sign of [-1, 1]) {
+    box([6.7, 0.09, 0.09], [0, 0.315, sign * 1.08], darkMetal);
+    tube(
+      [
+        [-4.2, 0.31, sign * 1.18],
+        [-2.2, 0.3, sign * 0.67],
+        [0.6, 0.3, sign * 0.67],
+      ],
+      0.045,
+      darkMetal,
+    );
+  }
+  for (const axle of [-2.65, 2.65]) {
+    box([0.18, 0.1, 2.65], [axle, 0.31, 0], darkMetal);
+    box([0.7, 0.12, 0.62], [axle, 0.29, 0], trim);
+  }
+  for (const x of [-1.25, 0, 1.25]) box([0.07, 0.035, 2.1], [x, 0.335, 0], darkMetal);
+  box([1.15, 0.1, 0.8], [-2.15, 0.29, 0], darkMetal);
+
   // Colores de entrada sRGB convertidos al espacio de trabajo lineal.
   const converted = new Set();
   car.traverse((o) => {
