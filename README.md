@@ -8,7 +8,54 @@ Escape relentless police patrols and a searchlight helicopter across an open mou
 
 Built with **TypeScript, Three.js, and Rapier 3D**. Play free in your browser — no downloads required.
 
-**[Play the game](https://apex-night-drive.pages.dev/)** · [Gameplay & controls](#cómo-se-juega) · [Tech stack](#lenguajes-y-tecnologías)
+**[Play the game](https://apex-night-drive.pages.dev/)** · [English overview](#english-overview) · [Información en español](#cómo-se-juega) · [Screenshots / Capturas](#capturas)
+
+---
+
+## English overview
+
+### Gameplay
+
+**Survive for as long as you can.** Explore mountain roads and dirt shortcuts while the police try to intercept you. Collisions are part of the chase: a patrol must maintain **5 seconds of continuous contact** to catch you. Breaking contact resets that timer.
+
+The helicopter has a separate capture timer. Stay inside its white searchlight circle for **5 continuous seconds** and the chase ends; leaving the circle resets the aerial timer.
+
+| Chase time                        | What changes                                                                                           |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Start                             | One patrol. Your speed limit starts at 100 km/h; the patrol starts at 106 km/h.                        |
+| Every 45 seconds, up to 3 minutes | Intensity increases as both vehicles' speed limits rise gradually.                                     |
+| 3 minutes · Level 5/5             | Maximum alert: flashing red intensity bar. Your limit reaches 130 km/h; the patrol can reach 200 km/h. |
+| 4 minutes · Level 6/6             | A second patrol joins with the same physics and 200 km/h speed limit.                                  |
+| 5 minutes · Level 7/7             | The H-01 helicopter joins at up to 230 km/h, tracking you with a 20 m-wide searchlight.                |
+
+These are speed limits, not guaranteed speeds: slopes, traction, steering and collisions affect the cars' actual movement. Pausing freezes the chase clock.
+
+### How it was made
+
+- **TypeScript and JavaScript** power the gameplay, pursuit AI, navigation and procedural world generation.
+- **Three.js / WebGL** render the vehicles, mountain landscape, materials, cameras and lighting. Cars and the helicopter are modeled through code, including animated rotors.
+- **Rapier 3D / WebAssembly** handles rigid bodies, collisions and wheel suspension at a fixed 60 Hz. The player and both patrols share the same driving physics, with different speed limits.
+- **GLSL and Canvas 2D** provide terrain and searchlight effects, procedural textures and the minimap.
+- **HTML, CSS and GSAP** provide the interface and its entrance animations.
+- **Vite and Node.js** support development, production builds and automated tests. **GitHub and Cloudflare Pages** handle source control and automatic deployment.
+
+Performance work includes sector-based visibility, distance-based detail, shared and instanced geometry, nearby tree colliders, adaptive resolution and a simplified road mesh. The helicopter's searchlight uses a visual effect without adding a dynamic light or shadow pass.
+
+### Controls
+
+| Action                                     | Key            |
+| ------------------------------------------ | -------------- |
+| Accelerate / brake and reverse             | ↑ / ↓ or W / S |
+| Steer                                      | ← / → or A / D |
+| Handbrake                                  | Space          |
+| Toggle headlights                          | L              |
+| Switch exterior camera                     | C or 1–4       |
+| Look behind                                | Hold B         |
+| Right your car without resetting the chase | F              |
+| Pause                                      | P or Esc       |
+| Restart the chase                          | R              |
+
+Camera and paint options are also available in the on-screen controls. The game pauses when its window loses focus.
 
 ---
 
