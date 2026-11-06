@@ -1,12 +1,16 @@
-# APEX — Night Drive
+# APEX: Night Pursuit
 
-### [▶ Jugar ahora](https://apex-night-drive.pages.dev/)
+### A 3D police chase game built for the browser
 
-**Una noche, una sierra y una persecución que no deja de crecer.**
+[**▶ Play now**](https://apex-night-drive.pages.dev/)
 
-Juego de conducción 3D para navegador. Recorre carreteras de montaña, busca atajos de tierra y sal del asfalto para escapar de la policía. Cuanto más tiempo resistas, más peligrosos serán tus perseguidores: primero una patrulla, después refuerzos y finalmente un helicóptero.
+Escape relentless police patrols and a searchlight helicopter across an open mountain landscape. Drive through the night, take dirt-road shortcuts, and survive an escalating pursuit with physics-based handling.
 
-Gratis, sin descargas ni instalación. Se juega directamente en [apex-night-drive.pages.dev](https://apex-night-drive.pages.dev/).
+Built with **TypeScript, Three.js, and Rapier 3D**. Play free in your browser — no downloads required.
+
+**[Play the game](https://apex-night-drive.pages.dev/)** · [Gameplay & controls](#cómo-se-juega) · [Tech stack](#lenguajes-y-tecnologías)
+
+---
 
 ## Cómo se juega
 

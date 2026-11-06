@@ -29,7 +29,7 @@
     "typescript": "5.9.3",
     "vite": "8.1.4"
   },
-  "description": "Conducción nocturna 3D por una ruta de montaña, con Three.js, Rapier y TypeScript.",
+  "description": "A browser-based 3D police chase game with an open mountain landscape, physics-based driving, and helicopter pursuits. Built with TypeScript, Three.js, and Rapier.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/miguerg334-afk/videogame.git"
