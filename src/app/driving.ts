@@ -19,6 +19,8 @@ import { createPursuit } from '../police/pursuit';
 import { createReinforcements } from '../police/reinforcements';
 import { createAirPursuit, AIR_CAPTURE_SECONDS } from '../police/air-pursuit';
 import { createAirVisual } from '../police/air-visual';
+import { createMissiles, MISSILE_BLAST_RADIUS } from '../police/missiles';
+import { createMissileVisual } from '../police/missile-visual';
 import { createPursuitNavigation } from '../police/navigation';
 import { CAPTURE_SECONDS, createGameSession } from './session';
 import { renderRatioLimit } from '../engine/quality';
@@ -112,6 +114,21 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     if (distance < 6.4) return mountain.routeHeight(x, z) + 0.04;
     return mountain.terrain.sampleSurfaceHeight(x, z);
   });
+  const missiles = createMissiles(driveGroundHeight, (position) => {
+    const p = body.translation();
+    const dx = p.x - position.x,
+      dz = p.z - position.z;
+    const distance = Math.hypot(dx, p.y - position.y, dz);
+    if (distance >= MISSILE_BLAST_RADIUS) return;
+    const strength = (1 - distance / MISSILE_BLAST_RADIUS) * body.mass();
+    const horizontal = Math.hypot(dx, dz) || 1;
+    body.applyImpulse(
+      { x: (dx / horizontal) * strength * 8, y: strength * 2, z: (dz / horizontal) * strength * 8 },
+      true,
+    );
+    notice('EXPLOSIÓN · ¡Sigue moviéndote!');
+  });
+  const missileVisual = createMissileVisual(scene, driveGroundHeight);
   const session = createGameSession();
   document.body.classList.add('is-menu');
   element('startMenu').hidden = false;
@@ -224,6 +241,8 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     lookingBack = false;
   function resetPursuit() {
     air.reset();
+    missiles.reset();
+    missileVisual.reset();
     airVisual.reset();
     reinforcements.reset();
     backupModel.rig.visible = false;
@@ -458,10 +477,16 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     element('capture-meter').style.width = `${session.captureProgress * 100}%`;
     element('capture-bar').setAttribute('aria-valuenow', session.captureSeconds.toFixed(1));
     element('air-hud').hidden = !air.active;
+    const missileWarning =
+      missiles.warning > 0
+        ? `MISIL EN ${missiles.warning.toFixed(1)} S · ¡GIRA!`
+        : missiles.missiles.some((m) => m.active)
+          ? 'MISIL EN CAMINO · ¡GIRA!'
+          : '';
     element('air-status').textContent = air.illuminated
-      ? `SAL DEL FOCO · ${(AIR_CAPTURE_SECONDS - air.exposure).toFixed(1)} S`
-      : 'HELICÓPTERO · 230 KM/H';
-    element('air-hud').classList.toggle('illuminated', air.illuminated);
+      ? `SAL DEL FOCO · ${(AIR_CAPTURE_SECONDS - air.exposure).toFixed(1)} S${missileWarning ? ' · ' + missileWarning : ''}`
+      : missileWarning || 'HELICÓPTERO · 230 KM/H';
+    element('air-hud').classList.toggle('illuminated', air.illuminated || missiles.warning > 0);
     element('air-meter').style.width = `${(air.exposure / AIR_CAPTURE_SECONDS) * 100}%`;
     element('air-capture').setAttribute('aria-valuenow', air.exposure.toFixed(1));
     const velocity = body.linvel(),
@@ -572,6 +597,9 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     mountain.boundary.enforce(police.body);
     simTime += dt;
     air.step(dt, police.elapsed, body.translation(), body.linvel());
+    const wasWarning = missiles.warning > 0;
+    missiles.step(dt, air.active, air.position, body.translation());
+    if (!wasWarning && missiles.warning > 0) notice('MISIL EN PREPARACIÓN · ¡Cambia de dirección!');
     if (air.caught) {
       losePursuit(true);
       return;
@@ -586,7 +614,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
       lastPoliceLevel = police.difficulty.level;
       notice(
         police.difficulty.level === 7
-          ? 'APOYO AÉREO · Evita el foco blanco'
+          ? 'APOYO AÉREO · Evita el foco y esquiva los misiles'
           : police.difficulty.level === 6
             ? 'REFUERZOS · Dos patrullas en persecución'
             : police.difficulty.maximumAlert
@@ -673,6 +701,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     const p = body.translation(),
       q = body.rotation();
     airVisual.update(air, dt, previewTime);
+    missileVisual.update(missiles);
     rig.position.set(p.x, p.y, p.z);
     rigQuat.set(q.x, q.y, q.z, q.w);
     rig.quaternion.copy(rigQuat);
@@ -788,6 +817,7 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
         root === backupModel.rig ||
         root === airVisual.group ||
         root === airVisual.effects ||
+        root === missileVisual.root ||
         root === sky ||
         root === key.target ||
         root instanceof THREE.Light,

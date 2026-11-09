@@ -30,6 +30,12 @@ The helicopter has a separate capture timer. Stay inside its white searchlight c
 
 These are speed limits, not guaranteed speeds: slopes, traction, steering and collisions affect the cars' actual movement. Pausing freezes the chase clock.
 
+### Guided missiles
+
+At level 7, the helicopter also fires guided missiles. A **1.8-second warning** precedes each launch; attacks are spaced by at least 7 seconds plus the warning. Missiles turn at a limited rate and stop guiding within 18 m of the car, so sharp changes of direction can make them miss. Keep moving and turn across their approach instead of driving straight.
+
+Ground impacts create explosions with a 9 m blast radius. Nearby blasts push the car without causing instant defeat; patrol contact and searchlight capture rules still apply. Effects use bounded reusable pools and instanced particles, without extra dynamic lights or physical debris.
+
 ### How it was made
 
 - **TypeScript and JavaScript** power the gameplay, pursuit AI, navigation and procedural world generation.
@@ -80,6 +86,12 @@ Son límites de velocidad: las pendientes, el agarre, los giros y los golpes afe
 - **Persecución dinámica:** la policía anticipa tu movimiento, busca rutas y maniobra para salir de los obstáculos. El helicóptero persigue desde el aire con aceleración e inercia.
 - **Ambiente nocturno:** montañas, luna, bosque, faros con encendido manual y luces policiales animadas.
 - **Cámaras exteriores:** seguimiento, amplia, táctica y retrovisor; pintura configurable, minimapa y controles táctiles.
+
+### Misiles y explosiones
+
+En el nivel 7, el helicóptero también dispara misiles teledirigidos. Hay un **aviso de 1,8 segundos** antes de cada lanzamiento y al menos 7 segundos más el aviso entre disparos. Los misiles tienen giro limitado y dejan de corregir su trayectoria a menos de 18 m del coche: cambia bruscamente de dirección para esquivarlos.
+
+Los impactos en el suelo generan explosiones con un radio de 9 m. Si estás cerca, la onda empuja el coche, pero no pierdes de inmediato: siguen vigentes las capturas por contacto y por el foco. Los efectos reutilizan objetos y partículas instanciadas, sin luces dinámicas adicionales ni escombros físicos.
 
 ## Capturas
 
