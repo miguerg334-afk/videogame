@@ -27,6 +27,7 @@ The helicopter has a separate capture timer. Stay inside its white searchlight c
 | 3 minutes · Level 5/5             | Maximum alert: flashing red intensity bar. Your limit reaches 130 km/h; the patrol can reach 200 km/h. |
 | 4 minutes · Level 6/6             | A second patrol joins with the same physics and 200 km/h speed limit.                                  |
 | 5 minutes · Level 7/7             | The H-01 helicopter joins at up to 230 km/h, tracking you with a 20 m-wide searchlight.                |
+| 6 minutes · Level 8/8             | The helicopter adds TITAN heavy missiles, alternating with standard missiles.                          |
 
 These are speed limits, not guaranteed speeds: slopes, traction, steering and collisions affect the cars' actual movement. Pausing freezes the chase clock.
 
@@ -35,6 +36,12 @@ These are speed limits, not guaranteed speeds: slopes, traction, steering and co
 At level 7, the helicopter also fires guided missiles. A **1.8-second warning** precedes each launch; attacks are spaced by at least 7 seconds plus the warning. Missiles turn at a limited rate and stop guiding within 18 m of the car, so sharp changes of direction can make them miss. Keep moving and turn across their approach instead of driving straight.
 
 Ground impacts create explosions with a 9 m blast radius. The same shockwave affects your car and both police patrols, with distance-scaled push, lift and rotational impulses that can cause skids or rollovers. A missile never ends the chase directly: losing control can leave you vulnerable to patrol contact or searchlight capture. Effects use bounded reusable pools and instanced particles, without extra dynamic lights or physical debris.
+
+### Level 8/8 · TITAN heavy missiles
+
+At **6 minutes**, the helicopter unlocks a second missile design: a dark armored body, yellow bands and large fins. TITAN alternates with standard missiles. Its **22 m blast radius** affects an area nearly six times larger than the standard blast, with a bigger fireball, smoke and an expanding shockwave. Stronger lift and rotational impulses can overturn nearby player and police cars.
+
+A **2.8-second warning** and yellow ground ring show the initially targeted area. Move away before launch: the initial aim is committed during the warning, then steering remains limited and shuts off within 30 m of the car. This keeps even overhead attacks avoidable. Both missile types only destabilize vehicles; defeat still requires patrol contact or searchlight capture.
 
 ### How it was made
 
@@ -71,13 +78,14 @@ El objetivo es **resistir el mayor tiempo posible**. Un choque no termina la par
 
 El helicóptero utiliza una captura independiente: debes salir de su círculo blanco antes de pasar **5 segundos seguidos bajo el foco**. Salir de la luz reinicia su cuenta.
 
-| Tiempo de persecución      | Intensidad y refuerzos                                              | Velocidades máximas                                        |
-| -------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Inicio                     | Nivel 1/5 · Una patrulla                                            | Jugador: 100 km/h · Patrulla: 106 km/h                     |
-| Cada 45 s, hasta los 3 min | Aumenta la intensidad; los límites de velocidad crecen gradualmente | Jugador: hasta 130 km/h · Patrulla: se aproxima a 150 km/h |
-| 3 min                      | Nivel 5/5 · Alerta máxima y barra roja intermitente                 | Jugador: 130 km/h · Patrulla: 200 km/h                     |
-| 4 min                      | Nivel 6/6 · Llega una segunda patrulla                              | Ambas patrullas: 200 km/h                                  |
-| 5 min                      | Nivel 7/7 · Se suma el helicóptero H-01                             | Helicóptero: 230 km/h · Foco de 20 m de diámetro           |
+| Tiempo de persecución      | Intensidad y refuerzos                                              | Velocidades máximas                                         |
+| -------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Inicio                     | Nivel 1/5 · Una patrulla                                            | Jugador: 100 km/h · Patrulla: 106 km/h                      |
+| Cada 45 s, hasta los 3 min | Aumenta la intensidad; los límites de velocidad crecen gradualmente | Jugador: hasta 130 km/h · Patrulla: se aproxima a 150 km/h  |
+| 3 min                      | Nivel 5/5 · Alerta máxima y barra roja intermitente                 | Jugador: 130 km/h · Patrulla: 200 km/h                      |
+| 4 min                      | Nivel 6/6 · Llega una segunda patrulla                              | Ambas patrullas: 200 km/h                                   |
+| 5 min                      | Nivel 7/7 · Se suma el helicóptero H-01                             | Helicóptero: 230 km/h · Foco de 20 m de diámetro            |
+| 6 min                      | Nivel 8/8 · Misiles pesados TITÁN                                   | Radio de explosión: 22 m; mismas velocidades de persecución |
 
 Son límites de velocidad: las pendientes, el agarre, los giros y los golpes afectan la velocidad real de los coches. La pausa detiene el tiempo de persecución.
 
@@ -92,6 +100,12 @@ Son límites de velocidad: las pendientes, el agarre, los giros y los golpes afe
 En el nivel 7, el helicóptero también dispara misiles teledirigidos. Hay un **aviso de 1,8 segundos** antes de cada lanzamiento y al menos 7 segundos más el aviso entre disparos. Los misiles tienen giro limitado y dejan de corregir su trayectoria a menos de 18 m del coche: cambia bruscamente de dirección para esquivarlos.
 
 Los impactos en el suelo generan explosiones con un radio de 9 m. La misma onda afecta a tu coche y a las dos patrullas: empuja, levanta y hace girar los vehículos según su distancia al impacto, pudiendo provocar derrapes o vuelcos. El misil nunca causa una derrota directa; perder el control puede dejarte expuesto a la captura por contacto o por el foco. Los efectos reutilizan objetos y partículas instanciadas, sin luces dinámicas adicionales ni escombros físicos.
+
+### Nivel 8/8 · Misil pesado TITÁN
+
+A los **6 minutos**, el helicóptero empieza a alternar los misiles normales con el TITÁN: cuerpo oscuro, bandas amarillas y aletas grandes. La explosión tiene un **radio de 22 m**, casi seis veces más superficie que la anterior, con una bola de fuego mayor, humo y una onda expansiva más amplia. Su empuje, elevación y giro pueden volcar tanto al jugador como a las patrullas cercanas.
+
+Hay **2,8 segundos de aviso** y un anillo amarillo que marca la zona apuntada inicialmente. Aléjate antes del lanzamiento: el misil parte hacia la posición fijada durante el aviso, corrige con giro limitado y deja de guiarse a menos de 30 m del coche. Las velocidades de la persecución se mantienen y ningún misil causa una derrota directa.
 
 ## Capturas
 

@@ -11,7 +11,7 @@ test('el nivel 5 dura un minuto y después entra una única patrulla idéntica c
   assert.equal(pursuitDifficulty(239.999).level, 5);
   assert.equal(pursuitDifficulty(240).level, 6);
   assert.equal(pursuitDifficulty(240).levelCount, 6);
-  assert.equal(pursuitDifficulty(600).level, 7);
+  assert.equal(pursuitDifficulty(600).level, 8);
   const world = new R.World({ x: 0, y: -9.81, z: 0 });
   world.createCollider(R.ColliderDesc.cuboid(1000, 0.1, 1000).setTranslation(0, -0.1, 0));
   const primary = createPursuit(world),

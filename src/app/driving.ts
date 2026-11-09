@@ -115,10 +115,10 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     if (distance < 6.4) return mountain.routeHeight(x, z) + 0.04;
     return mountain.terrain.sampleSurfaceHeight(x, z);
   });
-  const missiles = createMissiles(driveGroundHeight, (position) => {
-    const playerHit = applyExplosionImpulse(body, position);
-    applyExplosionImpulse(police.body, position);
-    if (reinforcements.officer) applyExplosionImpulse(reinforcements.officer.body, position);
+  const missiles = createMissiles(driveGroundHeight, (position, kind) => {
+    const playerHit = applyExplosionImpulse(body, position, kind);
+    applyExplosionImpulse(police.body, position, kind);
+    if (reinforcements.officer) applyExplosionImpulse(reinforcements.officer.body, position, kind);
     if (playerHit) notice('ONDA DE CHOQUE · ¡Recupera el control y evita la captura!');
   });
   const missileVisual = createMissileVisual(scene, driveGroundHeight);
@@ -472,9 +472,11 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     element('air-hud').hidden = !air.active;
     const missileWarning =
       missiles.warning > 0
-        ? `MISIL EN ${missiles.warning.toFixed(1)} S · ¡GIRA!`
+        ? `${missiles.warningKind === 'heavy' ? 'TITÁN' : 'MISIL'} EN ${missiles.warning.toFixed(1)} S · ¡GIRA!`
         : missiles.missiles.some((m) => m.active)
-          ? 'MISIL EN CAMINO · ¡GIRA!'
+          ? missiles.missiles.some((m) => m.active && m.kind === 'heavy')
+            ? 'TITÁN EN CAMINO · ¡ALÉJATE!'
+            : 'MISIL EN CAMINO · ¡GIRA!'
           : '';
     element('air-status').textContent = air.illuminated
       ? `SAL DEL FOCO · ${(AIR_CAPTURE_SECONDS - air.exposure).toFixed(1)} S${missileWarning ? ' · ' + missileWarning : ''}`
@@ -591,8 +593,13 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     simTime += dt;
     air.step(dt, police.elapsed, body.translation(), body.linvel());
     const wasWarning = missiles.warning > 0;
-    missiles.step(dt, air.active, air.position, body.translation());
-    if (!wasWarning && missiles.warning > 0) notice('MISIL EN PREPARACIÓN · ¡Cambia de dirección!');
+    missiles.step(dt, air.active, air.position, body.translation(), police.elapsed);
+    if (!wasWarning && missiles.warning > 0)
+      notice(
+        missiles.warningKind === 'heavy'
+          ? 'MISIL TITÁN · ¡Aléjate de la zona de impacto!'
+          : 'MISIL EN PREPARACIÓN · ¡Cambia de dirección!',
+      );
     if (air.caught) {
       losePursuit(true);
       return;
@@ -606,13 +613,15 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     if (police.difficulty.level !== lastPoliceLevel) {
       lastPoliceLevel = police.difficulty.level;
       notice(
-        police.difficulty.level === 7
-          ? 'APOYO AÉREO · Evita el foco y esquiva los misiles'
-          : police.difficulty.level === 6
-            ? 'REFUERZOS · Dos patrullas en persecución'
-            : police.difficulty.maximumAlert
-              ? 'ALERTA MÁXIMA · La patrulla alcanza 200 km/h'
-              : `Sube la presión · Intensidad ${lastPoliceLevel}/${police.difficulty.levelCount}`,
+        police.difficulty.level === 8
+          ? 'NIVEL 8/8 · Misiles TITÁN: radio de explosión de 22 m'
+          : police.difficulty.level === 7
+            ? 'APOYO AÉREO · Evita el foco y esquiva los misiles'
+            : police.difficulty.level === 6
+              ? 'REFUERZOS · Dos patrullas en persecución'
+              : police.difficulty.maximumAlert
+                ? 'ALERTA MÁXIMA · La patrulla alcanza 200 km/h'
+                : `Sube la presión · Intensidad ${lastPoliceLevel}/${police.difficulty.levelCount}`,
       );
     }
     if (input.up || input.down) {
