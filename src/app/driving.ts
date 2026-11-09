@@ -19,7 +19,8 @@ import { createPursuit } from '../police/pursuit';
 import { createReinforcements } from '../police/reinforcements';
 import { createAirPursuit, AIR_CAPTURE_SECONDS } from '../police/air-pursuit';
 import { createAirVisual } from '../police/air-visual';
-import { createMissiles, MISSILE_BLAST_RADIUS } from '../police/missiles';
+import { createMissiles } from '../police/missiles';
+import { applyExplosionImpulse } from '../vehicle/blast';
 import { createMissileVisual } from '../police/missile-visual';
 import { createPursuitNavigation } from '../police/navigation';
 import { CAPTURE_SECONDS, createGameSession } from './session';
@@ -115,18 +116,10 @@ export function startDriving({ rendering, model, mountain, sim }: Dependencies) 
     return mountain.terrain.sampleSurfaceHeight(x, z);
   });
   const missiles = createMissiles(driveGroundHeight, (position) => {
-    const p = body.translation();
-    const dx = p.x - position.x,
-      dz = p.z - position.z;
-    const distance = Math.hypot(dx, p.y - position.y, dz);
-    if (distance >= MISSILE_BLAST_RADIUS) return;
-    const strength = (1 - distance / MISSILE_BLAST_RADIUS) * body.mass();
-    const horizontal = Math.hypot(dx, dz) || 1;
-    body.applyImpulse(
-      { x: (dx / horizontal) * strength * 8, y: strength * 2, z: (dz / horizontal) * strength * 8 },
-      true,
-    );
-    notice('EXPLOSIÓN · ¡Sigue moviéndote!');
+    const playerHit = applyExplosionImpulse(body, position);
+    applyExplosionImpulse(police.body, position);
+    if (reinforcements.officer) applyExplosionImpulse(reinforcements.officer.body, position);
+    if (playerHit) notice('ONDA DE CHOQUE · ¡Recupera el control y evita la captura!');
   });
   const missileVisual = createMissileVisual(scene, driveGroundHeight);
   const session = createGameSession();
